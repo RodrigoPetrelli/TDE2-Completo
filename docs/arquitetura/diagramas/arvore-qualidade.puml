@@ -1,0 +1,24 @@
+@startmindmap arvore-qualidade
+!include _estilo.iuml
+title Árvore de qualidade (ISO/IEC 25010)
+
+* Qualidade\nPedeJá
+** Manutenibilidade
+*** Q1: regra nova em 1 fatia, sem tocar outras
+*** Q2: violação de camada quebra o build (testes de arquitetura)
+** Escalabilidade
+*** Q3: pico de 10x no almoço sem intervenção manual
+** Disponibilidade
+*** Q4: falha em Notificações não impede criar pedido
+** Desempenho
+*** Q5: POST /pedidos p95 < 300 ms
+left side
+** Implantabilidade
+*** Q6: deploy independente de cada serviço e MFE
+** Testabilidade
+*** Q7: casos de uso testados sem HTTP nem banco
+** Segurança
+*** Q8: abuso limitado no gateway (429)
+** Observabilidade
+*** Q9: rastrear requisição por x-request-id
+@endmindmap

@@ -1,0 +1,45 @@
+@startuml c4-3-componentes-pedidos
+!pragma layout smetana
+!include <C4/C4_Component>
+!include _estilo.iuml
+LAYOUT_TOP_DOWN()
+
+title C4 Nível 3 — Componentes do Serviço Pedidos (Clean Architecture + Vertical Slice)
+
+Container(gw, "API Gateway", "Express / API Gateway")
+ContainerQueue(bus, "Barramento de eventos", "EventBridge / memória")
+
+Container_Boundary(ped, "Serviço Pedidos (services/pedidos)") {
+  Component(root, "Composition root", "pedidos.service.ts", "Cria repositórios, casos de uso, rotas e assinaturas")
+  Component(fcriar, "Fatia criar-pedido", "criar-pedido.ts + .http.ts", "POST /pedidos")
+  Component(fconsultar, "Fatia consultar-pedido", "consultar-pedido.ts + .http.ts", "GET /pedidos/:id")
+  Component(fstatus, "Fatias confirmar / cancelar", "confirmar-pedido, cancelar-pedido", "PATCH /pedidos/:id/...")
+  Component(flistar, "Fatia listar-pedidos-cliente", "listar-pedidos-cliente.ts + .http.ts", "GET /clientes/:id/pedidos")
+  Component(freplica, "Fatias replicar-catalogo / replicar-clientes", "Consumidores de eventos", "Mantêm réplicas locais")
+  Component(portas, "Portas", "application/portas.ts", "PedidoRepositorio, CatalogoLocalRepositorio, ClientesLocalRepositorio")
+  Component(dominio, "Domínio", "domain/", "Pedido (agregado), ProdutoOfertado, regras e máquina de estados")
+  Component(repos, "Repositórios", "infrastructure/", "Implementam as portas (DynamoDB; local: memória)")
+}
+ContainerDb(db, "DB Pedidos", "DynamoDB")
+
+Rel(gw, fcriar, "HTTP")
+Rel(gw, fconsultar, "HTTP")
+Rel(gw, fstatus, "HTTP")
+Rel(gw, flistar, "HTTP")
+Rel(bus, freplica, "RestauranteCriado, ProdutoCadastrado, ClienteCadastrado")
+Rel(fcriar, bus, "Publica PedidoCriado")
+Rel(fstatus, bus, "Publica PedidoConfirmado / PedidoCancelado")
+Rel(fcriar, dominio, "Usa")
+Rel(fstatus, dominio, "Usa")
+Rel(fcriar, portas, "Depende de")
+Rel(fconsultar, portas, "Depende de")
+Rel(fstatus, portas, "Depende de")
+Rel(flistar, portas, "Depende de")
+Rel(freplica, portas, "Depende de")
+Rel(portas, dominio, "Referencia")
+Rel_U(repos, portas, "Implementa")
+Rel(repos, db, "Lê/grava")
+Rel(root, repos, "Instancia")
+
+SHOW_LEGEND()
+@enduml

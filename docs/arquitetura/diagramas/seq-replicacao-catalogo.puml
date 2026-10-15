@@ -1,0 +1,41 @@
+@startuml seq-replicacao-catalogo
+!include _estilo.iuml
+skinparam maxMessageSize 95
+skinparam ParticipantPadding 4
+skinparam defaultFontSize 14
+autonumber
+
+title C4 Nível 4 — Sequência (UML): Cadastro de produto e réplica no serviço Pedidos (EDA)
+
+actor "Restaurante" as R
+participant "API Gateway" as GW
+participant "Cadastrar\nProduto\n(Catálogo)" as UC
+participant "Restaurante\nRepositorio\n(DB Catálogo)" as RR
+participant "Produto" as P <<entity>>
+participant "Produto\nRepositorio\n(DB Catálogo)" as RP
+queue "Barramento\n(EventBridge)" as Bus
+participant "Replicar\nCatalogo\n(Pedidos)" as REP
+participant "CatalogoLocal\nRepositorio\n(DB Pedidos)" as RL
+
+R -> GW : POST /api/restaurantes/{id}/produtos
+GW -> UC : executar({restauranteId, nome, precoCentavos})
+UC -> RR : obter(restauranteId)
+alt restaurante inexistente
+  RR --> UC : undefined
+  UC --> GW : ErroNaoEncontrado
+  GW --> R : 404
+else restaurante existe
+  RR --> UC : Restaurante
+  UC -> P : criar(...) (valida preço > 0)
+  UC -> RP : salvar(produto)
+  UC -> Bus : publicar(catalogo.ProdutoCadastrado)
+  UC --> GW : DadosProduto
+  GW --> R : 201 Created
+  Bus -->> REP : aoCadastrarProduto(evento)
+  REP -> RL : salvarProduto(ProdutoOfertado)
+  note right of RL
+    Consistência eventual: o serviço Pedidos
+    nunca consulta o banco do Catálogo.
+  end note
+end
+@enduml

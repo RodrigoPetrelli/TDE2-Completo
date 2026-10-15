@@ -1,0 +1,236 @@
+@page {
+  size: A4;
+  margin: 18mm 16mm 18mm 16mm;
+}
+@page paisagem {
+  size: A4 landscape;
+  margin: 14mm 14mm 16mm 14mm;
+}
+
+:root {
+  --cor: #1d4f91;
+  --cor-clara: #eaf1fa;
+  --texto: #1b1b1b;
+  --borda: #c9d3e0;
+}
+
+html {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  font-size: 10.5pt;
+  color: var(--texto);
+  line-height: 1.45;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+body {
+  margin: 0;
+  background: #fff;
+}
+
+h1, h2, h3, h4 {
+  color: var(--cor);
+  break-after: avoid;
+}
+h2 {
+  font-size: 17pt;
+  border-bottom: 2px solid var(--cor);
+  padding-bottom: 4px;
+  margin-top: 0;
+  break-before: page;
+}
+h3 {
+  font-size: 13pt;
+  margin: 18px 0 6px;
+}
+h4 {
+  font-size: 11pt;
+  margin: 14px 0 4px;
+}
+p, li {
+  text-align: justify;
+}
+code {
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 9pt;
+  background: #f2f4f7;
+  padding: 0 3px;
+  border-radius: 3px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0 12px;
+  font-size: 9pt;
+  break-inside: auto;
+}
+tr {
+  break-inside: avoid;
+}
+th, td {
+  border: 1px solid var(--borda);
+  padding: 4px 6px;
+  vertical-align: top;
+  text-align: left;
+}
+thead th {
+  background: var(--cor);
+  color: #fff;
+}
+tbody tr:nth-child(even) td {
+  background: #f7f9fc;
+}
+table.matriz tbody th {
+  background: var(--cor-clara);
+  white-space: nowrap;
+}
+table.matriz td {
+  font-family: Consolas, monospace;
+  font-size: 8pt;
+}
+
+figure {
+  margin: 10px 0 14px;
+  text-align: center;
+  break-inside: avoid;
+}
+figure img {
+  max-width: 100%;
+  max-height: 228mm;
+  object-fit: contain;
+}
+figcaption {
+  font-size: 9pt;
+  font-style: italic;
+  color: #444;
+  margin-top: 4px;
+}
+.paisagem {
+  page: paisagem;
+}
+.paisagem figure img {
+  max-height: 165mm;
+}
+
+/* Capa ------------------------------------------------------------------ */
+.capa {
+  height: 255mm;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+  break-after: page;
+}
+.capa .sobre {
+  text-align: center;
+  color: #555;
+  letter-spacing: 0.5px;
+}
+.capa .titulo {
+  font-size: 46pt;
+  margin: 10px 0 0;
+}
+.capa .subtitulo {
+  font-size: 18pt;
+  text-align: center;
+  margin: 4px 0 6px;
+}
+.capa .base {
+  text-align: center;
+  color: #555;
+}
+.capa .integrantes {
+  margin: 36px auto 24px;
+  border: 1px solid var(--borda);
+  background: var(--cor-clara);
+  border-radius: 8px;
+  padding: 10px 40px 14px;
+}
+.capa .integrantes h2 {
+  break-before: auto;
+  border: 0;
+  font-size: 13pt;
+  margin: 4px 0;
+}
+.capa .integrantes ol {
+  text-align: left;
+  font-size: 13pt;
+  margin: 0;
+}
+.capa .integrantes li.pendente {
+  color: #b00020;
+}
+.capa .meta,
+.capa .nota-template {
+  text-align: center;
+  font-size: 9pt;
+  color: #555;
+}
+
+/* Sumário --------------------------------------------------------------- */
+.sumario h2 {
+  break-before: auto;
+}
+.sumario ol {
+  list-style: none;
+  padding-left: 0;
+}
+.sumario ol ol {
+  padding-left: 20px;
+}
+.sumario li {
+  margin: 3px 0;
+}
+.sumario a {
+  color: var(--texto);
+  text-decoration: none;
+}
+
+/* Software Architecture Canvas ----------------------------------------- */
+.canvas {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  font-size: 8.6pt;
+  break-inside: avoid;
+}
+.canvas > div {
+  border: 1.5px solid var(--cor);
+  border-radius: 6px;
+  padding: 4px 8px;
+  background: #fbfcfe;
+}
+.canvas h4 {
+  margin: 2px 0 4px;
+  font-size: 9.5pt;
+  text-transform: uppercase;
+}
+.canvas ul {
+  margin: 0;
+  padding-left: 16px;
+}
+.canvas p,
+.canvas li {
+  text-align: left;
+  margin: 0;
+}
+
+/* Árvore de código ------------------------------------------------------ */
+pre.arvore {
+  font-family: Consolas, monospace;
+  font-size: 7.6pt;
+  line-height: 1.25;
+  background: #f6f8fa;
+  border: 1px solid var(--borda);
+  padding: 8px 10px;
+  column-count: 2;
+  column-gap: 18px;
+  white-space: pre;
+}
+td:first-child code {
+  white-space: nowrap;
+}
+.paisagem h3,
+.paisagem h4 {
+  margin-top: 0;
+}

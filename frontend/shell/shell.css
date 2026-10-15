@@ -1,0 +1,32 @@
+:root {
+  --cor: #c2410c;
+  --fundo: #faf7f5;
+  --texto: #1c1917;
+  --borda: #e7e0db;
+}
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  background: var(--fundo);
+  color: var(--texto);
+}
+.topo {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  padding: 16px 24px;
+  background: var(--cor);
+  color: #fff;
+}
+.grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  padding: 16px;
+}
+section {
+  background: #fff;
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  padding: 16px;
+}

@@ -1,0 +1,49 @@
+@startuml eda
+!pragma layout smetana
+!include _estilo.iuml
+skinparam componentStyle rectangle
+left to right direction
+
+title Arquitetura Orientada a Eventos — produtores, eventos e consumidores
+
+package "Produtores" {
+  [Serviço Catálogo] as cat
+  [Serviço Clientes] as cli
+  [Serviço Pedidos] as pedP
+}
+
+queue "Barramento de eventos\n(EventBridge / memória)" as bus
+
+package "Eventos de integração (shared/contracts/eventos.ts)" {
+  card "catalogo.RestauranteCriado" as e1
+  card "catalogo.ProdutoCadastrado" as e2
+  card "clientes.ClienteCadastrado" as e3
+  card "pedidos.PedidoCriado" as e4
+  card "pedidos.PedidoConfirmado" as e5
+  card "pedidos.PedidoCancelado" as e6
+}
+
+package "Consumidores" {
+  [Pedidos: replicar-catalogo] as c1
+  [Pedidos: replicar-clientes] as c2
+  [Notificações: notificar-novo-pedido] as c3
+  [Notificações: notificar-status-pedido] as c4
+}
+
+cat --> e1
+cat --> e2
+cli --> e3
+pedP --> e4
+pedP --> e5
+pedP --> e6
+e1 --> bus
+e2 --> bus
+e3 --> bus
+e4 --> bus
+e5 --> bus
+e6 --> bus
+bus --> c1 : RestauranteCriado,\nProdutoCadastrado
+bus --> c2 : ClienteCadastrado
+bus --> c3 : PedidoCriado
+bus --> c4 : PedidoConfirmado,\nPedidoCancelado
+@enduml

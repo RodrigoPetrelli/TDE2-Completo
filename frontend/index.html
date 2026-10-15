@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PedeJá</title>
+    <link rel="stylesheet" href="/shell/shell.css" />
+    <!-- Shell (container) dos microfrontends: compõe os MFEs em tempo de execução.
+         Cada MFE é publicado de forma independente (na nuvem: S3 + CloudFront, um prefixo por time). -->
+    <script type="module" src="/shell/shell.js"></script>
+    <script type="module" src="/mfe-catalogo/mfe-catalogo.js"></script>
+    <script type="module" src="/mfe-pedidos/mfe-pedidos.js"></script>
+  </head>
+  <body>
+    <header class="topo"><strong>PedeJá</strong><span>delivery de restaurantes</span></header>
+    <main class="grade">
+      <section><pedeja-catalogo></pedeja-catalogo></section>
+      <section><pedeja-pedidos></pedeja-pedidos></section>
+    </main>
+  </body>
+</html>

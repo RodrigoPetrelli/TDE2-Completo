@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<title>PedeJá — Documentação de Arquitetura (arc42)</title>
+<link rel="stylesheet" href="estilo.css" />
+</head>
+<body>
+
+<!-- ===================================================================== -->
+<section class="capa">
+  <p class="sobre">{{disciplina}} · {{atividade}}</p>
+  <h1 class="titulo">PedeJá</h1>
+  <p class="subtitulo">Documentação de Arquitetura de Software</p>
+  <p class="base">arc42 · C4 Model (níveis 1 a 4) · UML · DER · Software Architecture Canvas</p>
+  <div class="integrantes">
+    <h2 class="nao-numerar">Integrantes do grupo</h2>
+    {{integrantes}}
+  </div>
+  <p class="meta">{{instituicao-professor}}Versão 1.0 · {{data}}</p>
+  <p class="nota-template">Estrutura baseada no template oficial arc42 (arc42.org), versão 9. Os diagramas são gerados a partir dos
+  arquivos-fonte em <code>docs/arquitetura/diagramas</code> (PlantUML, incluindo a biblioteca C4-PlantUML).</p>
+</section>
+
+<section class="sumario">
+  <h2 class="nao-numerar">Sumário</h2>
+  {{sumario}}
+</section>
+
+<!-- ===================================================================== -->
+<h2 id="s1">1. Introdução e Objetivos</h2>
+
+<p>O <strong>PedeJá</strong> é uma plataforma de pedidos de delivery de restaurantes. Clientes consultam cardápios e fazem pedidos;
+restaurantes parceiros mantêm o cardápio e confirmam ou cancelam pedidos; a plataforma notifica as partes a cada mudança.
+A versão de partida era um único arquivo de rotas Express, com validação, regras de negócio, acesso a dados e notificação dentro
+dos handlers. Este documento descreve a arquitetura-alvo e a refatoração entregue no repositório, que aplica os estilos
+arquiteturais pedidos: <em>Serverless, Microfrontends, BFF + Microsserviços + Database per Service, API Gateway, Arquitetura Orientada a
+Eventos, Clean Architecture com Vertical Slice e Testes Unitários de Arquitetura</em>.</p>
+
+<h3>1.1 Visão geral dos requisitos</h3>
+<table>
+  <thead><tr><th>ID</th><th>Requisito funcional</th><th>Endpoint</th><th>Serviço / fatia</th></tr></thead>
+  <tbody>
+    <tr><td>RF01</td><td>Cadastrar restaurante (nome, categoria)</td><td><code>POST /api/restaurantes</code></td><td>Catálogo / criar-restaurante</td></tr>
+    <tr><td>RF02</td><td>Listar e consultar restaurantes</td><td><code>GET /api/restaurantes[/:id]</code></td><td>Catálogo / listar-restaurantes, obter-restaurante</td></tr>
+    <tr><td>RF03</td><td>Cadastrar produto no cardápio (preço inteiro &gt; 0 em centavos)</td><td><code>POST /api/restaurantes/:id/produtos</code></td><td>Catálogo / cadastrar-produto</td></tr>
+    <tr><td>RF04</td><td>Listar cardápio do restaurante</td><td><code>GET /api/restaurantes/:id/produtos</code></td><td>Catálogo / listar-cardapio</td></tr>
+    <tr><td>RF05</td><td>Cadastrar cliente com e-mail válido e único</td><td><code>POST /api/clientes</code></td><td>Clientes / cadastrar-cliente</td></tr>
+    <tr><td>RF06</td><td>Criar pedido: itens do mesmo restaurante, disponíveis; total = subtotal + taxa de R$ 7,90</td><td><code>POST /api/pedidos</code></td><td>Pedidos / criar-pedido</td></tr>
+    <tr><td>RF07</td><td>Consultar pedido e histórico do cliente</td><td><code>GET /api/pedidos/:id</code>, <code>GET /api/clientes/:id/pedidos</code></td><td>Pedidos / consultar-pedido, listar-pedidos-cliente</td></tr>
+    <tr><td>RF08</td><td>Confirmar (CRIADO→CONFIRMADO) e cancelar (CRIADO|CONFIRMADO→CANCELADO)</td><td><code>PATCH /api/pedidos/:id/confirmar|cancelar</code></td><td>Pedidos / confirmar-pedido, cancelar-pedido</td></tr>
+    <tr><td>RF09</td><td>Notificar restaurante (novo pedido) e cliente (mudança de status)</td><td>— (eventos)</td><td>Notificações / notificar-*</td></tr>
+    <tr><td>RF10</td><td>Telas agregadas: vitrine do restaurante, histórico e resumo móvel</td><td><code>/bff/web/*</code>, <code>/bff/mobile/*</code></td><td>BFF Web, BFF Mobile</td></tr>
+  </tbody>
+</table>
+<p>Erros seguem o contrato <code>{"erro": "mensagem"}</code>: 400 (validação), 404 (não encontrado), 422 (regra de negócio) e 429 (rate limit).</p>
+
+<h3>1.2 Objetivos de qualidade</h3>
+<table>
+  <thead><tr><th>Prioridade</th><th>Objetivo</th><th>Motivação</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td><strong>Manutenibilidade / evolutividade</strong></td><td>O código inicial misturava tudo nas rotas. Cada funcionalidade nova deve ser isolada em uma fatia, sem efeitos colaterais.</td></tr>
+    <tr><td>2</td><td><strong>Escalabilidade elástica</strong></td><td>Delivery tem picos fortes no almoço e no jantar. Os serviços devem escalar de forma independente e custar pouco na ociosidade.</td></tr>
+    <tr><td>3</td><td><strong>Disponibilidade / resiliência</strong></td><td>Falha em uma capacidade secundária, como notificações, não pode impedir a criação de pedidos.</td></tr>
+    <tr><td>4</td><td><strong>Implantabilidade independente</strong></td><td>Times distintos (Catálogo, Pedidos, Front) devem publicar sem coordenar deploys.</td></tr>
+    <tr><td>5</td><td><strong>Testabilidade e conformidade arquitetural</strong></td><td>As regras de dependência precisam ser verificadas automaticamente, e não só documentadas.</td></tr>
+  </tbody>
+</table>
+
+<h3>1.3 Partes interessadas (stakeholders)</h3>
+<table>
+  <thead><tr><th>Papel</th><th>Expectativa em relação à arquitetura</th></tr></thead>
+  <tbody>
+    <tr><td>Cliente final</td><td>Fazer pedidos rapidamente, ver o total correto e acompanhar o status.</td></tr>
+    <tr><td>Restaurante parceiro</td><td>Manter o cardápio e ser avisado de novos pedidos imediatamente.</td></tr>
+    <tr><td>Times de desenvolvimento (Catálogo, Clientes, Pedidos, Front)</td><td>Autonomia de código, dados e deploy; regras de arquitetura claras e verificáveis.</td></tr>
+    <tr><td>Operação / SRE</td><td>Observabilidade (correlation id), escalabilidade automática e baixo custo operacional.</td></tr>
+    <tr><td>Professor / avaliadores</td><td>Rastreabilidade entre os estilos arquiteturais, os diagramas e o código entregue.</td></tr>
+  </tbody>
+</table>
+
+<!-- ===================================================================== -->
+<h2 id="s2">2. Restrições de Arquitetura</h2>
+<table>
+  <thead><tr><th>Tipo</th><th>Restrição</th><th>Consequência</th></tr></thead>
+  <tbody>
+    <tr><td>Técnica</td><td>TypeScript (strict) em Node.js ≥ 24; Express 4 como adaptador HTTP local.</td><td>Mesma linguagem no backend, BFFs e handlers Lambda.</td></tr>
+    <tr><td>Técnica</td><td>Nuvem-alvo AWS: API Gateway, Lambda, EventBridge, DynamoDB, S3 + CloudFront, SNS/SES.</td><td>Estilos Serverless e EDA usam serviços gerenciados.</td></tr>
+    <tr><td>Técnica</td><td>Valores monetários em centavos (inteiros).</td><td>Sem erros de ponto flutuante nos totais.</td></tr>
+    <tr><td>Técnica</td><td>Sem framework de injeção de dependência.</td><td>Injeção manual em composition roots (<code>*.service.ts</code>, <code>app.ts</code>, <code>lambda.ts</code>).</td></tr>
+    <tr><td>Organizacional</td><td>Trabalho em grupo de 4 integrantes; estilos arquiteturais definidos pelo enunciado.</td><td>Todos os estilos aparecem no código ou na arquitetura-alvo documentada.</td></tr>
+    <tr><td>Organizacional</td><td>Clean Architecture, Vertical Slice e testes de arquitetura devem refletir o código entregue.</td><td>Estrutura de pastas e testes em <code>backend/tests/arquitetura</code> fazem parte do build.</td></tr>
+    <tr><td>Convenção</td><td>Linguagem ubíqua em português (Pedido, Cardápio, Restaurante) no domínio e nos contratos.</td><td>Nomes de classes, eventos e endpoints em pt-BR.</td></tr>
+    <tr><td>Convenção</td><td>Fatia = pasta <code>features/&lt;fatia&gt;/</code> com <code>&lt;fatia&gt;.ts</code> (caso de uso) e <code>&lt;fatia&gt;.http.ts</code> (adaptador).</td><td>Convenção usada pelos testes de arquitetura para classificar arquivos.</td></tr>
+  </tbody>
+</table>
+
+<!-- ===================================================================== -->
+<h2 id="s3">3. Contexto e Escopo</h2>
+
+<h3>3.1 Contexto de negócio (C4 Nível 1)</h3>
+{{diagrama c4-1-contexto 88 | C4 Nível 1: diagrama de contexto do sistema PedeJá}}
+<table>
+  <thead><tr><th>Parceiro</th><th>Entrada para o PedeJá</th><th>Saída do PedeJá</th></tr></thead>
+  <tbody>
+    <tr><td>Cliente</td><td>Cadastro, pedidos (itens e quantidades), cancelamento</td><td>Cardápio, total do pedido, status, notificações</td></tr>
+    <tr><td>Restaurante parceiro</td><td>Restaurante, produtos, confirmação/cancelamento</td><td>Aviso de novo pedido</td></tr>
+    <tr><td>Serviço de e-mail/push (SNS/SES)</td><td>—</td><td>Mensagens de notificação</td></tr>
+    <tr><td>Provedor de identidade (Cognito, planejado)</td><td>Tokens JWT validados no gateway</td><td>—</td></tr>
+  </tbody>
+</table>
+
+<h3>3.2 Contexto técnico</h3>
+<table>
+  <thead><tr><th>Canal</th><th>Protocolo / formato</th><th>Ponto de entrada</th></tr></thead>
+  <tbody>
+    <tr><td>Navegador (microfrontends)</td><td>HTTPS, JSON</td><td>CloudFront (estáticos) e API Gateway (<code>/bff/web</code>, <code>/api</code>)</td></tr>
+    <tr><td>App mobile</td><td>HTTPS, JSON enxuto</td><td>API Gateway (<code>/bff/mobile</code>)</td></tr>
+    <tr><td>Integração entre serviços</td><td>Eventos JSON no envelope <code>{id, tipo, ocorridoEm, dados}</code></td><td>Amazon EventBridge (local: barramento em memória)</td></tr>
+    <tr><td>BFF → serviços</td><td>HTTP interno com <code>x-request-id</code> propagado</td><td>API Gateway (<code>/api/*</code>)</td></tr>
+    <tr><td>Notificações</td><td>AWS SDK (SNS Publish)</td><td>Lambda <code>notificacoes</code></td></tr>
+  </tbody>
+</table>
+
+<!-- ===================================================================== -->
+<h2 id="s4">4. Estratégia de Solução</h2>
+<table>
+  <thead><tr><th>Estilo arquitetural</th><th>Como é aplicado no PedeJá</th><th>Onde está no código</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Microsserviços + Database per Service</strong></td><td>Quatro serviços por capacidade de negócio (Catálogo, Clientes, Pedidos, Notificações), cada um com repositórios próprios. Pedidos mantém <em>réplicas locais</em> de restaurantes, produtos e clientes e nunca lê o banco de outro serviço.</td><td><code>src/services/*</code>; <code>infrastructure/</code> instanciada só na composition root do serviço</td></tr>
+    <tr><td><strong>Arquitetura Orientada a Eventos</strong></td><td>Serviços publicam eventos de integração tipados. Pedidos consome eventos de Catálogo e Clientes para replicar dados (event-carried state transfer). Notificações reage a eventos de pedido.</td><td><code>shared/contracts/eventos.ts</code>, <code>BarramentoEventos</code></td></tr>
+    <tr><td><strong>API Gateway</strong></td><td>Entrada única com correlation id, rate limiting, roteamento por prefixo e tradução de erros. Na nuvem: Amazon API Gateway.</td><td><code>src/gateway/api-gateway.ts</code></td></tr>
+    <tr><td><strong>Backend for Frontend</strong></td><td>BFF Web agrega Catálogo + Pedidos para as telas; BFF Mobile devolve payloads enxutos. Os BFFs falam com os serviços só por HTTP.</td><td><code>src/bff/web</code>, <code>src/bff/mobile</code></td></tr>
+    <tr><td><strong>Serverless</strong></td><td>Cada serviço e BFF é uma função AWS Lambda. Notificações é 100% orientado a eventos, com handler Lambda real acionado pelo EventBridge.</td><td><code>services/notificacoes/lambda.ts</code></td></tr>
+    <tr><td><strong>Microfrontends</strong></td><td>Shell compõe <code>&lt;pedeja-catalogo&gt;</code> e <code>&lt;pedeja-pedidos&gt;</code> (Web Components), publicados de forma independente e integrados por eventos DOM.</td><td><code>frontend/</code></td></tr>
+    <tr><td><strong>Clean Architecture + Vertical Slice</strong></td><td>Dentro de cada serviço: <code>domain</code> ← <code>application</code> (portas) ← <code>features/&lt;fatia&gt;</code> (caso de uso + adaptador HTTP) ← <code>infrastructure</code>. Cada fatia é uma funcionalidade completa e isolada.</td><td><code>services/&lt;svc&gt;/{domain,application,features,infrastructure}</code></td></tr>
+    <tr><td><strong>Testes unitários de arquitetura</strong></td><td>O grafo de imports é extraído com o compilador TypeScript e as regras rodam no Jest junto dos demais testes. Uma violação quebra o build.</td><td><code>backend/tests/arquitetura/*.test.ts</code></td></tr>
+  </tbody>
+</table>
+
+<h3>4.1 Software Architecture Canvas</h3>
+<div class="canvas">
+  <div class="c-valor"><h4>Proposta de valor</h4><p>Pedir comida de restaurantes locais de forma rápida e confiável, com total transparente (subtotal + R$ 7,90) e aviso imediato ao restaurante.</p></div>
+  <div class="c-stake"><h4>Stakeholders principais</h4><ul><li>Clientes</li><li>Restaurantes parceiros</li><li>Times Catálogo, Clientes, Pedidos e Front</li><li>Operação / SRE</li></ul></div>
+  <div class="c-qual"><h4>Requisitos de qualidade</h4><ul><li>Manutenibilidade (fatias isoladas)</li><li>Escalabilidade elástica nos picos</li><li>Resiliência a falhas de notificação</li><li>Deploy independente</li><li>Conformidade verificada por testes</li></ul></div>
+  <div class="c-neg"><h4>Contexto de negócio</h4><p>Marketplace de delivery com picos nas refeições; restaurantes independentes; notificações por e-mail/push; autenticação via provedor externo.</p></div>
+  <div class="c-func"><h4>Funcionalidades centrais</h4><ul><li>Catálogo: restaurantes e cardápio</li><li>Cadastro de clientes</li><li>Pedido com regras e máquina de estados</li><li>Notificações por eventos</li><li>Telas agregadas (BFF)</li></ul></div>
+  <div class="c-tec"><h4>Tecnologias</h4><ul><li>TypeScript, Node.js 24, Express</li><li>AWS Lambda, API Gateway, EventBridge</li><li>DynamoDB, S3 + CloudFront, SNS/SES</li><li>Jest + compilador TS (testes de arquitetura)</li><li>PlantUML / C4-PlantUML</li></ul></div>
+  <div class="c-comp"><h4>Componentes</h4><ul><li>Shell + MFE Catálogo + MFE Pedidos</li><li>API Gateway</li><li>BFF Web, BFF Mobile</li><li>Serviços Catálogo, Clientes, Pedidos, Notificações</li><li>Barramento de eventos; 4 bancos</li></ul></div>
+  <div class="c-dec"><h4>Decisões centrais</h4><ul><li>Database per Service com réplicas por eventos (ADR-002)</li><li>Clean Architecture + Vertical Slice (ADR-004)</li><li>Regras verificadas por testes (ADR-005)</li><li>Serverless na AWS (ADR-006)</li></ul></div>
+  <div class="c-risco"><h4>Riscos e informações em aberto</h4><ul><li>Consistência eventual das réplicas</li><li>Sem outbox: evento pode se perder se a publicação falhar</li><li>Autenticação ainda não implementada</li><li>Persistência local apenas em memória</li></ul></div>
+</div>
+
+<!-- ===================================================================== -->
+<h2 id="s5">5. Visão de Blocos de Construção</h2>
+
+<h3>5.1 Nível 1: caixa-branca do sistema (C4 Nível 2 — Containers)</h3>
+{{diagrama c4-2-containers 100 | C4 Nível 2: containers do PedeJá}}
+<table>
+  <thead><tr><th>Container</th><th>Responsabilidade</th><th>Dados próprios</th></tr></thead>
+  <tbody>
+    <tr><td>Web Shell + Microfrontends</td><td>Composição das telas web; cada MFE pertence a um time.</td><td>—</td></tr>
+    <tr><td>API Gateway</td><td>Entrada única, correlation id, rate limiting, roteamento, erros.</td><td>—</td></tr>
+    <tr><td>BFF Web / BFF Mobile</td><td>Agregação e formatação por canal.</td><td>— (sem estado)</td></tr>
+    <tr><td>Serviço Catálogo</td><td>Restaurantes e produtos; publica RestauranteCriado e ProdutoCadastrado.</td><td>DB Catálogo</td></tr>
+    <tr><td>Serviço Clientes</td><td>Cadastro e consulta de clientes; publica ClienteCadastrado.</td><td>DB Clientes</td></tr>
+    <tr><td>Serviço Pedidos</td><td>Pedido, regras, totais e status; publica eventos de pedido; mantém réplicas.</td><td>DB Pedidos (+ réplicas)</td></tr>
+    <tr><td>Serviço Notificações</td><td>Reage a eventos de pedido e notifica restaurante/cliente (sem API HTTP).</td><td>DB Notificações</td></tr>
+    <tr><td>Barramento de eventos</td><td>Roteia eventos de integração entre produtores e consumidores.</td><td>—</td></tr>
+  </tbody>
+</table>
+
+<h3>5.2 Nível 2: componentes (C4 Nível 3)</h3>
+<div class="paisagem">
+<h4>5.2.1 Serviço Pedidos</h4>
+<p>Cada caixa "Fatia" é uma pasta em <code>features/</code> com seu caso de uso e seu adaptador de entrada. As fatias dependem só das portas
+(<code>application</code>) e do domínio; os repositórios (<code>infrastructure</code>) implementam as portas e são instanciados pela composition root.</p>
+{{diagrama c4-3-componentes-pedidos 100 | C4 Nível 3: componentes do Serviço Pedidos}}
+</div>
+
+<h4>5.2.2 API Gateway e BFFs</h4>
+{{diagrama c4-3-componentes-gateway-bff 82 | C4 Nível 3: componentes do API Gateway e dos BFFs}}
+
+<h4>5.2.3 Serviço Notificações (Serverless)</h4>
+{{diagrama c4-3-componentes-notificacoes 58 | C4 Nível 3: componentes do Serviço Notificações}}
+
+<h4>5.2.4 Microfrontends</h4>
+<p>O shell (<code>frontend/index.html</code>) carrega cada MFE como um módulo independente, que registra um Custom Element. Os MFEs não importam
+código uns dos outros: comunicam-se por <code>CustomEvent</code> no <code>window</code> (<code>pedeja:restaurante-selecionado</code>,
+<code>pedeja:pedido-criado</code>), e cada um chama o BFF Web.</p>
+{{diagrama microfrontends 66 | Composição dos microfrontends}}
+
+<h4>5.2.5 Estrutura do código: Clean Architecture × Vertical Slice</h4>
+<p>As camadas (linhas) seguem a regra da dependência da Clean Architecture: as setas apontam sempre para dentro. As fatias (colunas) cortam
+as camadas de entrada e de caso de uso. Domínio, portas e infraestrutura são compartilhados apenas dentro do mesmo serviço.</p>
+<table class="matriz">
+  <thead><tr><th>Camada \ Fatia (Pedidos)</th><th>criar-pedido</th><th>consultar-pedido</th><th>confirmar-pedido</th><th>cancelar-pedido</th><th>listar-pedidos-cliente</th><th>replicar-catalogo / -clientes</th></tr></thead>
+  <tbody>
+    <tr><th>Adaptador de entrada</th><td>criar-pedido.http.ts</td><td>consultar-pedido.http.ts</td><td>confirmar-pedido.http.ts</td><td>cancelar-pedido.http.ts</td><td>listar-pedidos-cliente.http.ts</td><td>assinatura no barramento</td></tr>
+    <tr><th>Caso de uso</th><td>CriarPedido</td><td>ConsultarPedido</td><td>ConfirmarPedido</td><td>CancelarPedido</td><td>ListarPedidosCliente</td><td>ReplicarCatalogo / ReplicarClientes</td></tr>
+    <tr><th>Portas (application)</th><td colspan="6">PedidoRepositorio · CatalogoLocalRepositorio · ClientesLocalRepositorio · BarramentoEventos · Relogio · GeradorId</td></tr>
+    <tr><th>Domínio</th><td colspan="6">Pedido (agregado) · ItemPedido · StatusPedido · ProdutoOfertado · erros de domínio</td></tr>
+    <tr><th>Infraestrutura</th><td colspan="6">PedidoRepositorioMemoria · CatalogoLocalRepositorioMemoria · ClientesLocalRepositorioMemoria (nuvem: DynamoDB)</td></tr>
+  </tbody>
+</table>
+<p>Árvore de <code>backend/src</code>, gerada automaticamente a partir do repositório no build deste documento:</p>
+{{arvore-codigo}}
+
+<h3>5.3 Nível 3: código (C4 Nível 4 — UML)</h3>
+<p>O nível 4 do C4 é documentado com diagramas UML de <strong>classes</strong>, <strong>componentes</strong> e <strong>sequência</strong>.
+Os diagramas de sequência estão na seção 6 (visão de tempo de execução), conforme o template arc42.</p>
+<h4>5.3.1 Diagrama de classes: casos de uso, portas e adaptadores (Pedidos)</h4>
+{{diagrama c4-4-classes-pedidos 82 | C4 Nível 4: classes do Serviço Pedidos (casos de uso, portas e adaptadores)}}
+<h4>5.3.2 Diagrama de classes: domínio de Pedidos</h4>
+{{diagrama c4-4-classes-dominio 82 | C4 Nível 4: classes do domínio de Pedidos}}
+<h4>5.3.3 Diagrama de classes: shared kernel e EDA</h4>
+{{diagrama c4-4-classes-shared 85 | C4 Nível 4: classes do shared kernel (erros, portas, contratos de eventos)}}
+<h4>5.3.4 Diagrama de componentes UML (Pedidos)</h4>
+{{diagrama c4-4-componentes-uml 85 | C4 Nível 4: diagrama de componentes UML do Serviço Pedidos}}
+
+<!-- ===================================================================== -->
+<h2 id="s6">6. Visão de Tempo de Execução</h2>
+<p>Diagramas de sequência UML (C4 Nível 4) dos cenários mais importantes. Todos são cobertos por testes automatizados
+(<code>tests/e2e</code> e <code>tests/unit</code>).</p>
+
+<div class="paisagem">
+<h3>6.1 Criar pedido e notificar o restaurante</h3>
+<p>O caso de uso valida o formato (400), confere existência nas réplicas locais (404) e delega ao agregado as regras de negócio (422) e o
+cálculo do total. Persistido o pedido, publica <code>pedidos.PedidoCriado</code>; a notificação acontece de forma assíncrona em outro serviço.</p>
+{{diagrama seq-criar-pedido 100 | Sequência: criar pedido}}
+</div>
+
+<div class="paisagem">
+<h3>6.2 Cadastro de produto e replicação para Pedidos (EDA)</h3>
+{{diagrama seq-replicacao-catalogo 100 | Sequência: cadastro de produto e réplica por evento}}
+</div>
+
+<h3>6.3 Vitrine do restaurante via BFF Web</h3>
+{{diagrama seq-bff-vitrine 88 | Sequência: agregação no BFF Web}}
+
+<h3>6.4 Confirmar / cancelar pedido</h3>
+{{diagrama seq-cancelar-pedido 92 | Sequência: cancelar pedido}}
+
+<h3>6.5 Ciclo de vida do pedido</h3>
+{{diagrama estado-pedido 55 | Máquina de estados do agregado Pedido}}
+
+<!-- ===================================================================== -->
+<h2 id="s7">7. Visão de Implantação</h2>
+<h3>7.1 Infraestrutura nível 1: AWS (produção)</h3>
+{{diagrama implantacao 96 | Implantação na AWS (serverless)}}
+<table>
+  <thead><tr><th>Bloco de construção</th><th>Artefato</th><th>Infraestrutura</th></tr></thead>
+  <tbody>
+    <tr><td>Shell + MFEs</td><td><code>frontend/**</code></td><td>S3 (um prefixo por MFE) + CloudFront</td></tr>
+    <tr><td>API Gateway</td><td>Tabela de rotas (prefixo → função)</td><td>Amazon API Gateway HTTP API + autorizador JWT</td></tr>
+    <tr><td>BFF Web, BFF Mobile, Catálogo, Clientes, Pedidos</td><td>Composition root de cada um, empacotada como Lambda</td><td>AWS Lambda (Node.js 24)</td></tr>
+    <tr><td>Notificações</td><td><code>services/notificacoes/lambda.ts</code> (<code>handler</code>)</td><td>AWS Lambda acionada por regra do EventBridge</td></tr>
+    <tr><td>Barramento</td><td>Adaptador do <code>BarramentoEventos</code> (PutEvents)</td><td>Amazon EventBridge (bus <code>pedeja</code>)</td></tr>
+    <tr><td>Bancos por serviço</td><td>Adaptadores dos repositórios</td><td>Amazon DynamoDB (tabelas separadas, IAM por função)</td></tr>
+  </tbody>
+</table>
+<h3>7.2 Infraestrutura nível 1: ambiente local</h3>
+<p>Para desenvolvimento e testes, <code>app.ts</code> (composition root local) sobe gateway, BFFs e serviços num único processo, ligados pelo
+barramento em memória. Os casos de uso são os mesmos da nuvem; só mudam os adaptadores.</p>
+{{diagrama implantacao-local 72 | Implantação local (desenvolvimento)}}
+
+<!-- ===================================================================== -->
+<h2 id="s8">8. Conceitos Transversais</h2>
+
+<h3>8.1 Modelo de dados e Database per Service (DER)</h3>
+<p>Cada serviço é dono do seu banco. Relações entre bancos são apenas <em>referências lógicas</em> (ids), sem chave estrangeira física. O Serviço
+Pedidos guarda réplicas mínimas (restaurante, produto, cliente) alimentadas por eventos e faz snapshot de nome e preço em
+<code>item_pedido</code>, para que mudanças futuras no cardápio não alterem pedidos já feitos.</p>
+{{diagrama der 92 | Diagrama de Entidades e Relacionamentos (um banco por serviço)}}
+
+<h3>8.2 Arquitetura orientada a eventos</h3>
+{{diagrama eda 100 | Produtores, eventos de integração e consumidores}}
+<table>
+  <thead><tr><th>Evento</th><th>Produtor</th><th>Consumidores</th><th>Dados</th></tr></thead>
+  <tbody>
+    <tr><td><code>catalogo.RestauranteCriado</code></td><td>Catálogo</td><td>Pedidos (réplica)</td><td>restauranteId, nome, categoria</td></tr>
+    <tr><td><code>catalogo.ProdutoCadastrado</code></td><td>Catálogo</td><td>Pedidos (réplica)</td><td>produtoId, restauranteId, nome, precoCentavos, disponivel</td></tr>
+    <tr><td><code>clientes.ClienteCadastrado</code></td><td>Clientes</td><td>Pedidos (réplica)</td><td>clienteId, nome, email</td></tr>
+    <tr><td><code>pedidos.PedidoCriado</code></td><td>Pedidos</td><td>Notificações</td><td>pedidoId, clienteId, restauranteId, restauranteNome, quantidadeItens, totalCentavos</td></tr>
+    <tr><td><code>pedidos.PedidoConfirmado</code></td><td>Pedidos</td><td>Notificações</td><td>pedidoId, clienteId, restauranteId</td></tr>
+    <tr><td><code>pedidos.PedidoCancelado</code></td><td>Pedidos</td><td>Notificações</td><td>pedidoId, clienteId, restauranteId</td></tr>
+  </tbody>
+</table>
+<p>Os contratos ficam em <code>shared/contracts/eventos.ts</code> e são o único acoplamento permitido entre serviços. A falha de um
+consumidor é registrada e não afeta o produtor; na nuvem, o EventBridge faz retentativas e envia para uma DLQ.</p>
+
+<h3>8.3 Regras de Clean Architecture e Vertical Slice</h3>
+<ul>
+  <li><strong>domain</strong>: entidades, agregados e regras; não importa nada fora de <code>domain</code> nem frameworks.</li>
+  <li><strong>application</strong>: portas (interfaces) de repositórios e plataforma (<code>BarramentoEventos</code>, <code>Relogio</code>, <code>GeradorId</code>).</li>
+  <li><strong>features/&lt;fatia&gt;</strong>: <code>&lt;fatia&gt;.ts</code> é o caso de uso (sem HTTP); <code>&lt;fatia&gt;.http.ts</code> é o adaptador de
+      entrada, que só traduz HTTP e delega. Uma fatia não importa outra.</li>
+  <li><strong>infrastructure</strong>: implementações das portas, instanciadas somente pela composition root do próprio serviço.</li>
+  <li><strong>composition roots</strong>: <code>&lt;servico&gt;.service.ts</code> (local), <code>lambda.ts</code> (serverless) e <code>app.ts</code> (processo local completo).</li>
+</ul>
+
+<h3>8.4 Testes unitários de arquitetura</h3>
+<p>Os testes de arquitetura leem os imports de todos os arquivos de <code>src/</code> com <code>ts.preProcessFile</code>, do compilador TypeScript,
+e verificam as regras abaixo. Cada regra exige ao menos um arquivo correspondente, para não passar "no vazio". Durante o desenvolvimento,
+três violações foram inseridas de propósito (domínio importando express, fatia importando outra fatia, serviço importando outro serviço)
+e os testes falharam como esperado. Lista gerada a partir dos arquivos de teste:</p>
+{{testes-arquitetura}}
+
+<h3>8.5 Tratamento de erros</h3>
+<p>O domínio lança <code>ErroValidacao</code>, <code>ErroNaoEncontrado</code> ou <code>ErroRegraNegocio</code>, que não conhecem HTTP. O adaptador
+<code>shared/http/tratador-erros.ts</code> mapeia esses erros para 400, 404 e 422; JSON malformado vira 400 e o restante, 500. Os BFFs repassam
+ao front o status e o corpo do serviço chamado (<code>ErroServico</code>).</p>
+
+<h3>8.6 Segurança, observabilidade e configuração</h3>
+<ul>
+  <li><strong>Correlation id</strong>: o gateway gera ou propaga <code>x-request-id</code>, e os BFFs o repassam nas chamadas aos serviços.</li>
+  <li><strong>Rate limiting</strong>: janela fixa por IP no gateway (HTTP 429); na nuvem, throttling do API Gateway.</li>
+  <li><strong>Roteamento observável</strong>: cabeçalho <code>x-servico</code> indica o destino da requisição.</li>
+  <li><strong>Autenticação</strong> (planejada): autorizador JWT do API Gateway com Amazon Cognito.</li>
+  <li><strong>Menor privilégio</strong>: cada Lambda tem papel IAM com acesso apenas às próprias tabelas, o que reforça o Database per Service.</li>
+  <li><strong>Configuração</strong>: <code>PORT</code> e <code>SERVICOS_URL</code> por variáveis de ambiente.</li>
+</ul>
+
+<!-- ===================================================================== -->
+<h2 id="s9">9. Decisões de Arquitetura</h2>
+<table class="adr">
+  <thead><tr><th>ADR</th><th>Decisão</th><th>Contexto e justificativa</th><th>Consequências</th></tr></thead>
+  <tbody>
+    <tr><td>001</td><td>Decompor em 4 microsserviços por capacidade de negócio</td><td>Times e ritmos de mudança distintos; picos concentrados em Pedidos.</td><td>+ escala e deploy independentes; − mais peças para operar.</td></tr>
+    <tr><td>002</td><td>Database per Service com réplicas alimentadas por eventos</td><td>Pedidos precisa de dados de Catálogo e Clientes sem acoplamento síncrono.</td><td>+ autonomia e resiliência; − consistência eventual.</td></tr>
+    <tr><td>003</td><td>Integração assíncrona por eventos (EventBridge)</td><td>Notificação não pode bloquear nem derrubar a criação do pedido.</td><td>+ desacoplamento; − rastreamento distribuído mais difícil (mitigado com x-request-id).</td></tr>
+    <tr><td>004</td><td>Clean Architecture dentro de cada serviço, organizada em Vertical Slices</td><td>O código inicial misturava camadas nas rotas.</td><td>+ casos de uso testáveis sem HTTP/banco; + mudanças localizadas em uma pasta.</td></tr>
+    <tr><td>005</td><td>Verificar a arquitetura com testes automatizados</td><td>Regras só documentadas tendem a ser violadas.</td><td>+ violações quebram o build; − convenção de pastas precisa ser seguida.</td></tr>
+    <tr><td>006</td><td>Serverless (Lambda) como modelo de execução</td><td>Carga com picos e vales; equipe pequena.</td><td>+ custo proporcional ao uso, sem servidores; − cold start (mitigado com init fora do handler).</td></tr>
+    <tr><td>007</td><td>API Gateway como entrada única + BFF por canal</td><td>Web e mobile precisam de formatos diferentes; preocupações transversais centralizadas.</td><td>+ fronts simples; − mais um salto de rede.</td></tr>
+    <tr><td>008</td><td>Microfrontends com Web Components e eventos DOM</td><td>Times de Catálogo e Pedidos publicam telas de forma independente.</td><td>+ sem framework obrigatório; − consistência visual depende do shell.</td></tr>
+    <tr><td>009</td><td>Execução local em processo único com adaptadores em memória</td><td>Desenvolver e testar sem conta AWS.</td><td>+ feedback rápido (testes em segundos); − não exercita latência real.</td></tr>
+  </tbody>
+</table>
+
+<!-- ===================================================================== -->
+<h2 id="s10">10. Requisitos de Qualidade</h2>
+<h3>10.1 Árvore de qualidade</h3>
+{{diagrama arvore-qualidade 100 | Árvore de qualidade}}
+<h3>10.2 Cenários de qualidade</h3>
+<table>
+  <thead><tr><th>ID</th><th>Atributo</th><th>Estímulo</th><th>Resposta esperada</th><th>Como é atendido</th></tr></thead>
+  <tbody>
+    <tr><td>Q1</td><td>Manutenibilidade</td><td>Nova regra de cancelamento</td><td>Alteração restrita a <code>cancelar-pedido</code> e ao agregado</td><td>Vertical Slice + domínio rico</td></tr>
+    <tr><td>Q2</td><td>Conformidade</td><td>Dev importa express no domínio</td><td>Build falha no CI</td><td>Testes de arquitetura</td></tr>
+    <tr><td>Q3</td><td>Escalabilidade</td><td>10x pedidos às 12h</td><td>Sem intervenção manual</td><td>Lambda + DynamoDB on-demand</td></tr>
+    <tr><td>Q4</td><td>Disponibilidade</td><td>Serviço Notificações fora do ar</td><td>Pedidos continuam sendo criados (201)</td><td>EDA assíncrona; falha do consumidor isolada</td></tr>
+    <tr><td>Q5</td><td>Desempenho</td><td>POST /pedidos em carga normal</td><td>p95 &lt; 300 ms</td><td>Leituras só em réplicas locais (sem chamadas síncronas a outros serviços)</td></tr>
+    <tr><td>Q6</td><td>Implantabilidade</td><td>Novo layout do MFE Catálogo</td><td>Deploy sem republicar os demais</td><td>Microfrontends + serviços independentes</td></tr>
+    <tr><td>Q7</td><td>Testabilidade</td><td>Testar regra de total</td><td>Teste unitário sem HTTP nem banco</td><td>Portas + fakes (<code>tests/unit</code>)</td></tr>
+    <tr><td>Q8</td><td>Segurança</td><td>Cliente dispara milhares de requisições</td><td>HTTP 429 após o limite</td><td>Rate limiting no gateway</td></tr>
+    <tr><td>Q9</td><td>Observabilidade</td><td>Investigar um pedido com erro</td><td>Requisição rastreada ponta a ponta</td><td><code>x-request-id</code> propagado</td></tr>
+  </tbody>
+</table>
+
+<!-- ===================================================================== -->
+<h2 id="s11">11. Riscos e Débitos Técnicos</h2>
+<table>
+  <thead><tr><th>#</th><th>Risco / débito</th><th>Impacto</th><th>Mitigação planejada</th></tr></thead>
+  <tbody>
+    <tr><td>R1</td><td>Consistência eventual: pedido criado logo após cadastrar produto pode não achar a réplica.</td><td>Médio</td><td>Retentativa no front; monitorar o atraso de entrega dos eventos.</td></tr>
+    <tr><td>R2</td><td>Sem transactional outbox: falha entre salvar e publicar perde o evento.</td><td>Alto</td><td>Outbox com DynamoDB Streams → EventBridge.</td></tr>
+    <tr><td>R3</td><td>Autenticação/autorização ainda não implementadas.</td><td>Alto</td><td>Autorizador JWT (Cognito) no API Gateway.</td></tr>
+    <tr><td>R4</td><td>Persistência local em memória: dados se perdem ao reiniciar.</td><td>Baixo (dev)</td><td>Adaptadores DynamoDB atrás das mesmas portas.</td></tr>
+    <tr><td>R5</td><td>Disponibilidade e preço do produto não se atualizam (não há evento de alteração).</td><td>Médio</td><td>Fatia <code>atualizar-produto</code> e evento <code>ProdutoAlterado</code>.</td></tr>
+    <tr><td>D1</td><td>Rate limiter em memória não funciona com várias instâncias.</td><td>Baixo</td><td>Usar o throttling nativo do API Gateway em produção.</td></tr>
+    <tr><td>D2</td><td>App mobile apenas planejado (BFF pronto).</td><td>Baixo</td><td>Roadmap.</td></tr>
+  </tbody>
+</table>
+
+<!-- ===================================================================== -->
+<h2 id="s12">12. Glossário</h2>
+<table>
+  <thead><tr><th>Termo</th><th>Definição</th></tr></thead>
+  <tbody>
+    <tr><td>Agregado</td><td>Conjunto de objetos de domínio tratado como unidade de consistência (ex.: Pedido e seus itens).</td></tr>
+    <tr><td>BFF</td><td>Backend for Frontend: backend dedicado a um canal (web, mobile) que agrega e molda dados.</td></tr>
+    <tr><td>C4 Model</td><td>Modelo de diagramas em 4 níveis: Contexto, Containers, Componentes e Código.</td></tr>
+    <tr><td>Composition root</td><td>Único ponto onde as implementações concretas são instanciadas e injetadas.</td></tr>
+    <tr><td>Database per Service</td><td>Cada microsserviço é dono exclusivo de seus dados.</td></tr>
+    <tr><td>EDA</td><td>Event-Driven Architecture: integração por eventos publicados em um barramento.</td></tr>
+    <tr><td>Evento de integração</td><td>Fato de negócio publicado por um serviço para outros (ex.: <code>pedidos.PedidoCriado</code>).</td></tr>
+    <tr><td>Fatia (Vertical Slice)</td><td>Funcionalidade completa (entrada + caso de uso) em uma única pasta.</td></tr>
+    <tr><td>Microfrontend</td><td>Parte da interface publicada de forma independente e composta por um shell.</td></tr>
+    <tr><td>Porta / Adaptador</td><td>Interface definida pela aplicação / implementação concreta dessa interface.</td></tr>
+    <tr><td>Réplica local</td><td>Cópia mínima de dados de outro serviço, mantida por eventos.</td></tr>
+    <tr><td>Serverless</td><td>Modelo de execução sem gestão de servidores (AWS Lambda), cobrado por uso.</td></tr>
+    <tr><td>Taxa de entrega</td><td>Valor fixo de 790 centavos (R$ 7,90) somado ao subtotal do pedido.</td></tr>
+  </tbody>
+</table>
+
+</body>
+</html>

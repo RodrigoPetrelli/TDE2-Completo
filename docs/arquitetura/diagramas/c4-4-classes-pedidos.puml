@@ -1,0 +1,84 @@
+@startuml c4-4-classes-pedidos
+!pragma layout smetana
+!include _estilo.iuml
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+hide empty members
+left to right direction
+
+title C4 Nível 4 — Classes (UML) do Serviço Pedidos: casos de uso, portas e adaptadores
+
+package "features (casos de uso — fatias verticais)" {
+  class CriarPedido {
+    +executar(entrada): Promise<DadosPedido>
+  }
+  class ConfirmarPedido {
+    +executar(id): Promise<DadosPedido>
+  }
+  class CancelarPedido {
+    +executar(id): Promise<DadosPedido>
+  }
+  class ConsultarPedido {
+    +executar(id): Promise<DadosPedido>
+  }
+  class ListarPedidosCliente {
+    +executar(clienteId): Promise<DadosPedido[]>
+  }
+  class ReplicarCatalogo {
+    +aoCriarRestaurante(e)
+    +aoCadastrarProduto(e)
+  }
+  class ReplicarClientes {
+    +aoCadastrarCliente(e)
+  }
+}
+
+package "application (portas)" {
+  interface PedidoRepositorio <<port>> {
+    +salvar(p: Pedido)
+    +obter(id): Pedido?
+    +listarPorCliente(clienteId): Pedido[]
+  }
+  interface CatalogoLocalRepositorio <<port>> {
+    +salvarRestaurante(r)
+    +obterRestaurante(id): RestauranteLocal?
+    +salvarProduto(p: ProdutoOfertado)
+    +obterProduto(id): ProdutoOfertado?
+  }
+  interface ClientesLocalRepositorio <<port>> {
+    +salvar(c: ClienteLocal)
+    +existe(id): boolean
+  }
+  interface BarramentoEventos <<port, shared>> {
+    +publicar(evento)
+  }
+}
+
+package "infrastructure" {
+  class PedidoRepositorioMemoria
+  class CatalogoLocalRepositorioMemoria
+  class ClientesLocalRepositorioMemoria
+}
+
+class Pedido <<domain>>
+
+CriarPedido --> PedidoRepositorio
+CriarPedido --> CatalogoLocalRepositorio
+CriarPedido --> ClientesLocalRepositorio
+CriarPedido --> BarramentoEventos
+CriarPedido ..> Pedido : cria
+ConfirmarPedido --> PedidoRepositorio
+ConfirmarPedido --> BarramentoEventos
+CancelarPedido --> PedidoRepositorio
+CancelarPedido --> BarramentoEventos
+ConsultarPedido --> PedidoRepositorio
+ListarPedidosCliente --> PedidoRepositorio
+ListarPedidosCliente --> ClientesLocalRepositorio
+ReplicarCatalogo --> CatalogoLocalRepositorio
+ReplicarClientes --> ClientesLocalRepositorio
+PedidoRepositorio ..> Pedido
+
+PedidoRepositorioMemoria ..|> PedidoRepositorio
+CatalogoLocalRepositorioMemoria ..|> CatalogoLocalRepositorio
+ClientesLocalRepositorioMemoria ..|> ClientesLocalRepositorio
+@enduml

@@ -1,0 +1,67 @@
+@startuml c4-4-componentes-uml
+!pragma layout smetana
+!include _estilo.iuml
+skinparam componentStyle uml2
+skinparam packageStyle rectangle
+left to right direction
+
+title C4 Nível 4 — Diagrama de Componentes (UML) do Serviço Pedidos
+
+component "HTTP\n(API Gateway)" <<interface>> as IHttp #F3EEFB
+component "Eventos\nentrada" <<interface>> as IEvt #F3EEFB
+
+package "services/pedidos" {
+  package "features (fatias)" {
+    [criar-pedido] as FCriar
+    [consultar-pedido] as FConsultar
+    [confirmar-pedido] as FConfirmar
+    [cancelar-pedido] as FCancelar
+    [listar-pedidos-cliente] as FListar
+    [replicar-catalogo] as FRepCat
+    [replicar-clientes] as FRepCli
+  }
+  package "application (portas)" {
+    component "PedidoRepositorio" <<interface>> as IRepo #F3EEFB
+    component "CatalogoLocalRepositorio" <<interface>> as ICat #F3EEFB
+    component "ClientesLocalRepositorio" <<interface>> as ICli #F3EEFB
+    component "BarramentoEventos" <<interface>> as IBus #F3EEFB
+  }
+  [domain\nPedido, ProdutoOfertado] as Dom
+  [infrastructure\nrepositórios] as Infra
+  [pedidos.service.ts\ncomposition root] as Root
+}
+
+[Barramento\nEventBridge / memória] as Bus
+
+IHttp --> FCriar
+IHttp --> FConsultar
+IHttp --> FConfirmar
+IHttp --> FCancelar
+IHttp --> FListar
+IEvt --> FRepCat
+IEvt --> FRepCli
+
+FCriar ..> IRepo
+FCriar ..> ICat
+FCriar ..> ICli
+FCriar ..> IBus
+FCriar ..> Dom
+FConfirmar ..> IRepo
+FConfirmar ..> IBus
+FConfirmar ..> Dom
+FCancelar ..> IRepo
+FCancelar ..> IBus
+FCancelar ..> Dom
+FConsultar ..> IRepo
+FListar ..> IRepo
+FListar ..> ICli
+FRepCat ..> ICat
+FRepCli ..> ICli
+
+IRepo <|.. Infra
+ICat <|.. Infra
+ICli <|.. Infra
+IBus <|.. Bus
+Root ..> Infra : instancia
+Root ..> Bus : assina
+@enduml

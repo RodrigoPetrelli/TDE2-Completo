@@ -1,0 +1,15 @@
+@startuml estado-pedido
+!pragma layout smetana
+!include _estilo.iuml
+
+title Máquina de estados (UML) do agregado Pedido
+
+[*] --> CRIADO : CriarPedido\n/ publica PedidoCriado
+CRIADO --> CONFIRMADO : confirmar()\n/ publica PedidoConfirmado
+CRIADO --> CANCELADO : cancelar()\n/ publica PedidoCancelado
+CONFIRMADO --> CANCELADO : cancelar()\n/ publica PedidoCancelado
+CANCELADO --> [*]
+
+CONFIRMADO : confirmar() -> 422
+CANCELADO : confirmar() / cancelar() -> 422
+@enduml

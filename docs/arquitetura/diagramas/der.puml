@@ -1,0 +1,103 @@
+@startuml der
+!pragma layout smetana
+!include _estilo.iuml
+hide circle
+skinparam linetype ortho
+skinparam packageStyle rectangle
+
+title Diagrama de Entidades e Relacionamentos — um banco por serviço
+
+package "DB Catálogo (serviço Catálogo)" #EEF4FB {
+  entity "restaurante" as restaurante {
+    * id : uuid <<PK>>
+    --
+    * nome : texto
+    * categoria : texto
+    * criado_em : timestamp
+  }
+  entity "produto" as produto {
+    * id : uuid <<PK>>
+    --
+    * restaurante_id : uuid <<FK>>
+    * nome : texto
+    * preco_centavos : inteiro > 0
+    * disponivel : booleano
+    * criado_em : timestamp
+  }
+}
+
+package "DB Clientes (serviço Clientes)" #EEFBF1 {
+  entity "cliente" as cliente {
+    * id : uuid <<PK>>
+    --
+    * nome : texto
+    * email : texto <<UNIQUE>>
+    * criado_em : timestamp
+  }
+}
+
+package "DB Pedidos (serviço Pedidos)" #FBF3EE {
+  entity "pedido" as pedido {
+    * id : uuid <<PK>>
+    --
+    * cliente_id : uuid <<ref. lógica>>
+    * restaurante_id : uuid <<ref. lógica>>
+    * subtotal_centavos : inteiro
+    * taxa_entrega_centavos : inteiro
+    * total_centavos : inteiro
+    * status : CRIADO | CONFIRMADO | CANCELADO
+    * criado_em : timestamp
+    * atualizado_em : timestamp
+  }
+  entity "item_pedido" as item {
+    * pedido_id : uuid <<PK, FK>>
+    * produto_id : uuid <<PK>>
+    --
+    * nome : texto (snapshot)
+    * quantidade : inteiro > 0
+    * preco_unitario_centavos : inteiro (snapshot)
+    * subtotal_centavos : inteiro
+  }
+  entity "restaurante_replica" as rrep {
+    * id : uuid <<PK>>
+    --
+    * nome : texto
+  }
+  entity "produto_replica" as prep {
+    * id : uuid <<PK>>
+    --
+    * restaurante_id : uuid
+    * nome : texto
+    * preco_centavos : inteiro
+    * disponivel : booleano
+  }
+  entity "cliente_replica" as crep {
+    * id : uuid <<PK>>
+    --
+    * nome : texto
+  }
+}
+
+package "DB Notificações (serviço Notificações)" #F5EEFB {
+  entity "notificacao" as notificacao {
+    * id : uuid <<PK>>
+    --
+    * pedido_id : uuid <<ref. lógica>>
+    * destinatario_tipo : RESTAURANTE | CLIENTE
+    * destinatario_id : uuid
+    * mensagem : texto
+    * criada_em : timestamp
+  }
+}
+
+restaurante ||--o{ produto : "oferece"
+pedido ||--|{ item : "contém"
+rrep ||--o{ prep : "oferece"
+crep ||--o{ pedido : "faz"
+rrep ||--o{ pedido : "recebe"
+
+restaurante .. rrep : "réplica via\nRestauranteCriado"
+produto .. prep : "réplica via\nProdutoCadastrado"
+cliente .. crep : "réplica via\nClienteCadastrado"
+pedido .. notificacao : "via eventos\nde pedido"
+@enduml

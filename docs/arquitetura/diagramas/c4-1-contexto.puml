@@ -1,0 +1,25 @@
+@startuml c4-1-contexto
+!pragma layout smetana
+!include <C4/C4_Context>
+!include _estilo.iuml
+LAYOUT_TOP_DOWN()
+
+title C4 Nível 1 — Diagrama de Contexto do Sistema PedeJá
+
+Person(cliente, "Cliente", "Pessoa que consulta cardápios e faz pedidos pelo navegador ou app")
+Person(restaurante, "Restaurante parceiro", "Cadastra cardápio e confirma ou cancela pedidos")
+
+System(pedeja, "PedeJá", "Plataforma de pedidos de delivery: catálogo, clientes, pedidos e notificações")
+
+System_Ext(mensageria, "Serviço de e-mail / push", "Amazon SNS / SES: entrega notificações")
+System_Ext(idp, "Provedor de identidade", "Amazon Cognito: autenticação OIDC/JWT (planejado)")
+
+Rel_D(cliente, pedeja, "Consulta cardápio, faz e acompanha pedidos", "HTTPS")
+Rel_D(restaurante, pedeja, "Gerencia cardápio, confirma/cancela pedidos", "HTTPS")
+Rel_D(pedeja, mensageria, "Publica notificações", "AWS SDK")
+Rel_R(pedeja, idp, "Valida tokens", "OIDC")
+Rel_U(mensageria, restaurante, "Avisa novo pedido")
+Rel_U(mensageria, cliente, "Avisa mudança de status")
+
+SHOW_LEGEND()
+@enduml

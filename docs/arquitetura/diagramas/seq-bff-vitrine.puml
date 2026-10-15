@@ -1,0 +1,37 @@
+@startuml seq-bff-vitrine
+!include _estilo.iuml
+skinparam maxMessageSize 95
+skinparam ParticipantPadding 4
+skinparam defaultFontSize 14
+autonumber
+
+title C4 Nível 4 — Sequência (UML): Vitrine do restaurante via BFF Web
+
+participant "MFE Catálogo" as MFE
+participant "API Gateway" as GW
+participant "BFF Web" as BFF
+participant "ClienteServicos" as CS
+participant "Serviço Catálogo" as CAT
+
+MFE -> GW : GET /bff/web/restaurantes/{id}/vitrine
+GW -> BFF : rota /bff/web (x-request-id)
+par chamadas em paralelo
+  BFF -> CS : obter(/api/restaurantes/{id})
+  CS -> GW : GET /api/restaurantes/{id}
+  GW -> CAT : ObterRestaurante
+  CAT --> CS : 200 restaurante
+else
+  BFF -> CS : obter(/api/restaurantes/{id}/produtos)
+  CS -> GW : GET /api/restaurantes/{id}/produtos
+  GW -> CAT : ListarCardapio
+  CAT --> CS : 200 produtos[]
+end
+CS --> BFF : dados
+BFF -> BFF : filtra disponíveis,\nformata preço (R$ 49,90)
+BFF --> GW : 200 { restaurante, cardapio }
+GW --> MFE : 200
+note over BFF, CS
+  Se um serviço responder 4xx, o BFF
+  repassa o mesmo status e corpo (ErroServico).
+end note
+@enduml

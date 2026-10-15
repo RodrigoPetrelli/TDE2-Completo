@@ -1,0 +1,90 @@
+@startuml c4-4-classes-shared
+!pragma layout smetana
+!include _estilo.iuml
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+hide empty members
+left to right direction
+
+title C4 Nível 4 — Diagrama de Classes (UML) do Shared Kernel e da EDA
+
+package "shared/domain" {
+  abstract class ErroDominio {
+    +{abstract} tipo: TipoErroDominio
+  }
+  class ErroValidacao {
+    tipo = VALIDACAO (400)
+  }
+  class ErroNaoEncontrado {
+    tipo = NAO_ENCONTRADO (404)
+  }
+  class ErroRegraNegocio {
+    tipo = REGRA_NEGOCIO (422)
+  }
+}
+
+package "shared/application" {
+  interface BarramentoEventos <<port>> {
+    +publicar(evento: EventoIntegracao)
+    +assinar<T>(tipo: T, manipulador)
+  }
+  interface Relogio <<port>> {
+    +agoraIso(): string
+  }
+  interface GeradorId <<port>> {
+    +gerar(): string
+  }
+  class DependenciasPlataforma <<type>> {
+    eventos: BarramentoEventos
+    ids: GeradorId
+    relogio: Relogio
+  }
+}
+
+package "shared/contracts" {
+  class "Envelope<T, D>" as Envelope <<type>> {
+    id: string
+    tipo: T
+    ocorridoEm: string
+    dados: D
+  }
+  class EventoIntegracao <<union>>
+  class RestauranteCriado
+  class ProdutoCadastrado
+  class ClienteCadastrado
+  class PedidoCriado
+  class PedidoConfirmado
+  class PedidoCancelado
+}
+
+package "shared/infrastructure" {
+  class BarramentoEventosMemoria {
+    -manipuladores: Map
+    +publicados: EventoIntegracao[]
+  }
+  class RelogioSistema
+  class GeradorIdUuid
+}
+
+ErroDominio <|-- ErroValidacao
+ErroDominio <|-- ErroNaoEncontrado
+ErroDominio <|-- ErroRegraNegocio
+
+Envelope <|-- RestauranteCriado
+Envelope <|-- ProdutoCadastrado
+Envelope <|-- ClienteCadastrado
+Envelope <|-- PedidoCriado
+Envelope <|-- PedidoConfirmado
+Envelope <|-- PedidoCancelado
+EventoIntegracao o-- RestauranteCriado
+EventoIntegracao o-- PedidoCriado
+
+DependenciasPlataforma --> BarramentoEventos
+DependenciasPlataforma --> Relogio
+DependenciasPlataforma --> GeradorId
+BarramentoEventos ..> EventoIntegracao
+
+BarramentoEventosMemoria ..|> BarramentoEventos
+RelogioSistema ..|> Relogio
+GeradorIdUuid ..|> GeradorId
+@enduml

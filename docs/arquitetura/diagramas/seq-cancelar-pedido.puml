@@ -1,0 +1,40 @@
+@startuml seq-cancelar-pedido
+!include _estilo.iuml
+skinparam maxMessageSize 95
+skinparam ParticipantPadding 4
+skinparam defaultFontSize 14
+autonumber
+
+title C4 Nível 4 — Sequência (UML): Confirmar / cancelar pedido
+
+actor "Restaurante ou Cliente" as U
+participant "API Gateway" as GW
+participant "CancelarPedido /\nConfirmarPedido" as UC
+participant "PedidoRepositorio" as RP
+participant "Pedido" as P <<aggregate>>
+queue "Barramento" as Bus
+participant "Lambda Notificações\n(NotificarStatusPedido)" as NOT
+
+U -> GW : PATCH /api/pedidos/{id}/cancelar
+GW -> UC : executar(id)
+UC -> RP : obter(id)
+alt pedido não existe
+  RP --> UC : undefined
+  UC --> GW : 404 Pedido não encontrado
+else pedido existe
+  RP --> UC : Pedido
+  UC -> P : cancelar(agora)
+  alt status = CANCELADO
+    P --> UC : ErroRegraNegocio
+    UC --> GW : 422
+  else status = CRIADO ou CONFIRMADO
+    P -> P : status := CANCELADO
+    UC -> RP : salvar(pedido)
+    UC -> Bus : publicar(pedidos.PedidoCancelado)
+    Bus -->> NOT : evento
+    NOT -> NOT : avisa o cliente
+    UC --> GW : 200 pedido
+  end
+end
+GW --> U : resposta
+@enduml

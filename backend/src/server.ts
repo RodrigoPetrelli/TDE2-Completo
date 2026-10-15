@@ -1,7 +1,7 @@
-import { app } from './app';
+import { criarAplicacao } from './app';
 
 const porta = Number(process.env.PORT) || 3000;
 
-app.listen(porta, () => {
-  console.log(`PedeJá backend rodando em http://localhost:${porta}`);
+criarAplicacao().listen(porta, () => {
+  console.log(`PedeJá rodando em http://localhost:${porta} (API Gateway + BFFs + microsserviços)`);
 });

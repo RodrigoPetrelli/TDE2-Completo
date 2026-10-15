@@ -1,0 +1,54 @@
+@startuml c4-2-containers
+!pragma layout smetana
+!include <C4/C4_Container>
+!include _estilo.iuml
+LAYOUT_TOP_DOWN()
+
+title C4 Nível 2 — Diagrama de Containers do PedeJá
+
+Person(cliente, "Cliente")
+Person(restaurante, "Restaurante parceiro")
+
+System_Boundary(pedeja, "PedeJá") {
+  Container(web, "Web Shell + Microfrontends", "HTML/JS, Web Components; S3 + CloudFront", "Shell compõe MFE Catálogo e MFE Pedidos")
+  Container(mobile, "App Mobile", "React Native (planejado)", "Acompanhamento de pedidos")
+  Container(gw, "API Gateway", "Amazon API Gateway (local: Express)", "Entrada única: roteamento, correlation id, rate limiting, autenticação")
+  Container(bffweb, "BFF Web", "TypeScript, AWS Lambda", "Agrega Catálogo + Pedidos para as telas web")
+  Container(bffmob, "BFF Mobile", "TypeScript, AWS Lambda", "Payloads enxutos para o app")
+  Container(cat, "Serviço Catálogo", "TypeScript, AWS Lambda", "Restaurantes e cardápio")
+  Container(cli, "Serviço Clientes", "TypeScript, AWS Lambda", "Cadastro de clientes")
+  Container(ped, "Serviço Pedidos", "TypeScript, AWS Lambda", "Criação e ciclo de vida do pedido")
+  Container(noti, "Serviço Notificações", "TypeScript, AWS Lambda (só eventos)", "Avisa restaurante e cliente")
+  ContainerQueue(bus, "Barramento de eventos", "Amazon EventBridge (local: memória)", "Eventos de integração entre serviços")
+  ContainerDb(dbcat, "DB Catálogo", "DynamoDB", "restaurantes, produtos")
+  ContainerDb(dbcli, "DB Clientes", "DynamoDB", "clientes")
+  ContainerDb(dbped, "DB Pedidos", "DynamoDB", "pedidos + réplicas")
+  ContainerDb(dbnot, "DB Notificações", "DynamoDB", "histórico")
+}
+System_Ext(sns, "Amazon SNS / SES", "E-mail / push")
+
+Rel(cliente, web, "Usa", "HTTPS")
+Rel(restaurante, web, "Usa", "HTTPS")
+Rel(cliente, mobile, "Usa")
+Rel(web, gw, "Chama /bff/web e /api", "JSON/HTTPS")
+Rel(mobile, gw, "Chama /bff/mobile", "JSON/HTTPS")
+Rel(gw, bffweb, "Roteia /bff/web/*")
+Rel(gw, bffmob, "Roteia /bff/mobile/*")
+Rel(bffweb, gw, "Consulta serviços", "HTTP")
+Rel(bffmob, gw, "Consulta serviços", "HTTP")
+Rel(gw, cat, "/api/restaurantes/*")
+Rel(gw, cli, "/api/clientes/*")
+Rel(gw, ped, "/api/pedidos/*")
+Rel(cat, dbcat, "Lê/grava")
+Rel(cli, dbcli, "Lê/grava")
+Rel(ped, dbped, "Lê/grava")
+Rel(noti, dbnot, "Grava")
+Rel(cat, bus, "Publica RestauranteCriado, ProdutoCadastrado")
+Rel(cli, bus, "Publica ClienteCadastrado")
+Rel(ped, bus, "Publica PedidoCriado/Confirmado/Cancelado")
+Rel(bus, ped, "Entrega eventos de catálogo e clientes")
+Rel(bus, noti, "Entrega eventos de pedidos")
+Rel(noti, sns, "Envia notificação")
+
+SHOW_LEGEND()
+@enduml

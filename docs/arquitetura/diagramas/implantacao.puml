@@ -1,0 +1,58 @@
+@startuml implantacao
+!pragma layout smetana
+!include <C4/C4_Deployment>
+!include _estilo.iuml
+LAYOUT_TOP_DOWN()
+
+title Diagrama de Implantação — AWS (região sa-east-1, serverless)
+
+Person(usuario, "Cliente / Restaurante", "Navegador ou app")
+
+Deployment_Node(aws, "AWS Cloud", "sa-east-1") {
+  Deployment_Node(edge, "Borda", "Amazon CloudFront + S3") {
+    Container(mfe, "Shell + MFEs", "HTML/JS estáticos", "Um prefixo S3 por microfrontend")
+  }
+  Deployment_Node(apigw, "Amazon API Gateway", "HTTP API + autorizador JWT (Cognito)") {
+    Container(gw, "API Gateway", "Rotas /api/* e /bff/*", "throttling, CORS, request id")
+  }
+  Deployment_Node(lambda, "AWS Lambda", "Node.js 24, arm64") {
+    Container(fbffw, "bff-web", "Lambda")
+    Container(fbffm, "bff-mobile", "Lambda")
+    Container(fcat, "catalogo", "Lambda")
+    Container(fcli, "clientes", "Lambda")
+    Container(fped, "pedidos", "Lambda")
+    Container(fnot, "notificacoes", "Lambda (lambda.handler)")
+  }
+  Deployment_Node(evb, "Amazon EventBridge", "event bus pedeja") {
+    ContainerQueue(bus, "Regras por source", "pedeja.catalogo / clientes / pedidos")
+  }
+  Deployment_Node(ddb, "Amazon DynamoDB", "on-demand") {
+    ContainerDb(tcat, "catalogo-*", "tabelas")
+    ContainerDb(tcli, "clientes", "tabela")
+    ContainerDb(tped, "pedidos, pedidos-replicas", "tabelas")
+    ContainerDb(tnot, "notificacoes", "tabela")
+  }
+  Deployment_Node(obs, "Amazon CloudWatch / X-Ray", "logs, métricas, traces") {
+    Container(logs, "Observabilidade", "Logs JSON com x-request-id")
+  }
+  Container(sns, "Amazon SNS / SES", "e-mail / push")
+}
+
+Rel(usuario, mfe, "HTTPS")
+Rel(usuario, gw, "HTTPS (JSON)")
+Rel(gw, fbffw, "invoca")
+Rel(gw, fbffm, "invoca")
+Rel(gw, fcat, "invoca")
+Rel(gw, fcli, "invoca")
+Rel(gw, fped, "invoca")
+Rel(fcat, tcat, "")
+Rel(fcli, tcli, "")
+Rel(fped, tped, "")
+Rel(fnot, tnot, "")
+Rel(fcat, bus, "PutEvents")
+Rel(fcli, bus, "PutEvents")
+Rel(fped, bus, "PutEvents")
+Rel(bus, fped, "regras catalogo/clientes")
+Rel(bus, fnot, "regra pedidos.*")
+Rel(fnot, sns, "Publish")
+@enduml

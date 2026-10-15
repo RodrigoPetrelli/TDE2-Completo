@@ -1,0 +1,45 @@
+@startuml c4-3-componentes-gateway-bff
+!pragma layout smetana
+!include <C4/C4_Component>
+!include _estilo.iuml
+LAYOUT_TOP_DOWN()
+
+title C4 Nível 3 — Componentes do API Gateway e dos BFFs
+
+Container(web, "Web Shell + Microfrontends", "Web Components")
+Container(mobile, "App Mobile", "planejado")
+
+Container_Boundary(gw, "API Gateway (gateway/api-gateway.ts)") {
+  Component(corr, "Correlação", "middleware", "Gera/propaga x-request-id")
+  Component(rate, "Rate limiter", "middleware", "Janela fixa por IP, responde 429")
+  Component(rot, "Tabela de rotas", "RotaGateway[]", "Prefixo -> destino; cabeçalho x-servico")
+  Component(err, "Tratador de erros", "shared/http", "ErroDominio -> 400/404/422; 500")
+}
+
+Container_Boundary(bffweb, "BFF Web (bff/web)") {
+  Component(vitrine, "Vitrine", "GET /restaurantes/:id/vitrine", "Restaurante + cardápio disponível, preço formatado")
+  Component(hist, "Histórico do cliente", "GET /clientes/:id/pedidos", "Pedidos + nome do restaurante")
+}
+Container_Boundary(bffmob, "BFF Mobile (bff/mobile)") {
+  Component(resumo, "Resumo do pedido", "GET /pedidos/:id", "id, status, total, nº itens")
+}
+Component(cliente, "ClienteServicos", "bff/compartilhado", "Cliente HTTP (fetch) para o gateway; repassa erros")
+
+Container(servicos, "Microsserviços", "Catálogo, Clientes, Pedidos")
+
+Rel(web, corr, "HTTPS")
+Rel(mobile, corr, "HTTPS")
+Rel(corr, rate, "próximo")
+Rel(rate, rot, "próximo")
+Rel(rot, vitrine, "/bff/web")
+Rel(rot, hist, "/bff/web")
+Rel(rot, resumo, "/bff/mobile")
+Rel(rot, servicos, "/api")
+Rel(vitrine, cliente, "Usa")
+Rel(hist, cliente, "Usa")
+Rel(resumo, cliente, "Usa")
+Rel(cliente, corr, "HTTP /api/*")
+Rel_L(rot, err, "Erros")
+
+SHOW_LEGEND()
+@enduml

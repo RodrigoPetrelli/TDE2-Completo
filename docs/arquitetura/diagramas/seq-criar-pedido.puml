@@ -1,0 +1,49 @@
+@startuml seq-criar-pedido
+!include _estilo.iuml
+skinparam maxMessageSize 95
+skinparam ParticipantPadding 4
+skinparam defaultFontSize 14
+skinparam sequenceMessageAlign center
+autonumber
+
+title C4 Nível 4 — Sequência (UML): Criar pedido e notificar o restaurante
+
+actor Cliente
+participant "MFE Pedidos" as MFE
+participant "API Gateway" as GW
+participant "criar-pedido.http" as HTTP
+participant "CriarPedido" as UC
+participant "ClientesLocal\nRepositorio" as RCli
+participant "CatalogoLocal\nRepositorio" as RCat
+participant "Pedido" as P <<aggregate>>
+participant "Pedido\nRepositorio" as RPed
+queue "Barramento\n(EventBridge)" as Bus
+participant "Lambda\nNotificações" as NOT
+
+Cliente -> MFE : Fazer pedido
+MFE -> GW : POST /api/pedidos
+GW -> GW : x-request-id, rate limit
+GW -> HTTP : rota /api (servico-pedidos)
+HTTP -> UC : executar(corpo)
+UC -> UC : validar formato (400)
+UC -> RCli : existe(clienteId)
+RCli --> UC : true
+UC -> RCat : obterRestaurante(id)
+RCat --> UC : RestauranteLocal
+loop para cada item
+  UC -> RCat : obterProduto(produtoId)
+  RCat --> UC : ProdutoOfertado
+end
+UC -> P : criar(linhas)
+P -> P : garantirPodeSerPedidoEm (422)\ncalcula subtotal + taxa 790
+P --> UC : pedido CRIADO
+UC -> RPed : salvar(pedido)
+UC -> Bus : publicar(pedidos.PedidoCriado)
+Bus -->> NOT : entrega assíncrona
+activate NOT
+NOT -> NOT : NotificarNovoPedido\n(avisa restaurante via SNS)
+deactivate NOT
+UC --> HTTP : DadosPedido
+HTTP --> GW : 201 Created
+GW --> MFE : 201 + pedido
+@enduml

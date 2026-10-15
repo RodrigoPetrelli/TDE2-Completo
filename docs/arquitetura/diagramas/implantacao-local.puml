@@ -1,0 +1,43 @@
+@startuml implantacao-local
+!pragma layout smetana
+!include _estilo.iuml
+
+title Diagrama de Implantação (UML) — Ambiente local / desenvolvimento
+
+node "Máquina do desenvolvedor" {
+  node "Processo Node.js 24 (npm run dev)\nporta 3000" as proc {
+    artifact "server.ts / app.ts\n(composition root local)" as app
+    component "API Gateway (Express)" as gw
+    component "BFF Web" as bw
+    component "BFF Mobile" as bm
+    component "Serviço Catálogo" as cat
+    component "Serviço Clientes" as cli
+    component "Serviço Pedidos" as ped
+    component "Serviço Notificações" as noti
+    queue "BarramentoEventosMemoria" as bus
+    database "Repositórios em memória\n(1 conjunto por serviço)" as mem
+  }
+  node "Navegador" {
+    artifact "frontend/ (shell + MFEs)" as fe
+  }
+}
+
+fe --> gw : HTTP localhost:3000
+app --> gw
+gw --> bw
+gw --> bm
+gw --> cat
+gw --> cli
+gw --> ped
+bw ..> gw : fetch /api/*
+bm ..> gw : fetch /api/*
+cat --> bus
+cli --> bus
+ped --> bus
+bus --> ped
+bus --> noti
+cat --> mem
+cli --> mem
+ped --> mem
+noti --> mem
+@enduml

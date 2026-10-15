@@ -1,0 +1,33 @@
+@startuml microfrontends
+!pragma layout smetana
+!include _estilo.iuml
+skinparam componentStyle rectangle
+
+title Microfrontends — composição em tempo de execução (Web Components)
+
+package "Navegador" {
+  component "Shell (index.html + shell/shell.js)\nlayout, contrato de eventos window.pedeja" as shell
+  component "<pedeja-catalogo>\nMFE Catálogo (time Catálogo)" as mcat
+  component "<pedeja-pedidos>\nMFE Pedidos (time Pedidos)" as mped
+}
+
+package "CloudFront + S3" {
+  artifact "/shell/*" as s1
+  artifact "/mfe-catalogo/*" as s2
+  artifact "/mfe-pedidos/*" as s3
+}
+
+component "API Gateway" as gw
+component "BFF Web" as bff
+
+shell ..> s1 : carrega
+mcat ..> s2 : carregado de
+mped ..> s3 : carregado de
+shell --> mcat : monta
+shell --> mped : monta
+mcat ..> mped : CustomEvent\n"pedeja:restaurante-selecionado"
+mped ..> mcat : CustomEvent\n"pedeja:pedido-criado"
+mcat --> gw : /api/restaurantes\n/bff/web/.../vitrine
+mped --> gw : /api/pedidos\n/bff/web/clientes/:id/pedidos
+gw --> bff
+@enduml

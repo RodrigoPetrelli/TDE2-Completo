@@ -1,0 +1,55 @@
+@startuml c4-4-classes-dominio
+!pragma layout smetana
+!include _estilo.iuml
+skinparam classAttributeIconSize 0
+hide empty members
+
+title C4 Nível 4 — Classes (UML) do domínio de Pedidos
+
+class Pedido <<aggregate root>> {
+  -dados: DadosPedido
+  +{static} criar(id, clienteId, restauranteId, linhas, agora): Pedido
+  +{static} restaurar(dados): Pedido
+  +id: string
+  +status: StatusPedido
+  +confirmar(agora)
+  +cancelar(agora)
+  +paraDados(): DadosPedido
+}
+class ItemPedido <<value object>> {
+  produtoId: string
+  nome: string
+  quantidade: number
+  precoUnitarioCentavos: number
+  subtotalCentavos: number
+}
+enum StatusPedido {
+  CRIADO
+  CONFIRMADO
+  CANCELADO
+}
+class LinhaPedido <<value object>> {
+  produto: ProdutoOfertado
+  quantidade: number
+}
+class ProdutoOfertado <<entity (réplica)>> {
+  +dados: DadosProdutoOfertado
+  +garantirPodeSerPedidoEm(restauranteId)
+}
+class "TAXA_ENTREGA_CENTAVOS = 790" as Taxa <<constant>>
+
+abstract class ErroDominio <<shared>>
+class ErroValidacao
+class ErroRegraNegocio
+ErroDominio <|-- ErroValidacao
+ErroDominio <|-- ErroRegraNegocio
+
+Pedido "1" *-- "1..*" ItemPedido : itens
+Pedido --> "1" StatusPedido
+Pedido ..> LinhaPedido : criar()
+LinhaPedido --> "1" ProdutoOfertado
+Pedido ..> Taxa
+Pedido ..> ErroValidacao : lança
+Pedido ..> ErroRegraNegocio : lança
+ProdutoOfertado ..> ErroRegraNegocio : lança
+@enduml

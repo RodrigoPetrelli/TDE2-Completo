@@ -1,0 +1,36 @@
+@startuml c4-3-componentes-notificacoes
+!pragma layout smetana
+!include <C4/C4_Component>
+!include _estilo.iuml
+LAYOUT_TOP_DOWN()
+
+title C4 Nível 3 — Componentes do Serviço Notificações (Serverless + EDA)
+
+ContainerQueue(bus, "Amazon EventBridge", "regra: source = pedeja.pedidos")
+
+Container_Boundary(noti, "Serviço Notificações (services/notificacoes)") {
+  Component(lambda, "Handler Lambda", "lambda.ts", "Recebe o evento EventBridge e repassa o detail")
+  Component(root, "Composition root / despachante", "notificacoes.service.ts", "processar(evento): escolhe a fatia pelo tipo")
+  Component(novo, "Fatia notificar-novo-pedido", "NotificarNovoPedido", "PedidoCriado -> avisa restaurante")
+  Component(status, "Fatia notificar-status-pedido", "NotificarStatusPedido", "PedidoConfirmado/Cancelado -> avisa cliente")
+  Component(dominio, "Domínio", "Notificacao", "Monta destinatário e mensagem")
+  Component(portas, "Portas", "Notificador, HistoricoNotificacoes", "")
+  Component(adapt, "Adaptadores", "infrastructure/adaptadores.ts", "NotificadorConsole (nuvem: SNS), HistoricoNotificacoesMemoria (nuvem: DynamoDB)")
+}
+System_Ext(sns, "Amazon SNS / SES")
+ContainerDb(db, "DB Notificações", "DynamoDB")
+
+Rel(bus, lambda, "Invoca (assíncrono)")
+Rel(lambda, root, "processar(detail)")
+Rel(root, novo, "pedidos.PedidoCriado")
+Rel(root, status, "pedidos.PedidoConfirmado / Cancelado")
+Rel(novo, dominio, "Cria")
+Rel(status, dominio, "Cria")
+Rel(novo, portas, "Depende de")
+Rel(status, portas, "Depende de")
+Rel_U(adapt, portas, "Implementa")
+Rel(adapt, sns, "Publica")
+Rel(adapt, db, "Grava")
+
+SHOW_LEGEND()
+@enduml
