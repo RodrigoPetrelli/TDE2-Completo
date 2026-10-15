@@ -1,12 +1,9 @@
 {
   "name": "pedeja-docs-arquitetura",
   "private": true,
-  "description": "Gera o PDF arc42 do PedeJá a partir dos diagramas PlantUML e do código",
+  "description": "Gera a documentação arc42 do PedeJá (DOCX a partir do template oficial arc42-PT e PDF)",
   "type": "module",
   "scripts": {
     "build": "node build.mjs"
-  },
-  "devDependencies": {
-    "puppeteer-core": "^23.11.1"
   }
 }

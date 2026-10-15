@@ -3,7 +3,6 @@
 <head>
 <meta charset="utf-8" />
 <title>PedeJá — Documentação de Arquitetura (arc42)</title>
-<link rel="stylesheet" href="estilo.css" />
 </head>
 <body>
 
@@ -18,7 +17,7 @@
     {{integrantes}}
   </div>
   <p class="meta">{{instituicao-professor}}Versão 1.0 · {{data}}</p>
-  <p class="nota-template">Estrutura baseada no template oficial arc42 (arc42.org), versão 9. Os diagramas são gerados a partir dos
+  <p class="nota-template">Documento elaborado sobre o template oficial arc42 em português (arc42.org, versão 8.2-PT). Os diagramas são gerados a partir dos
   arquivos-fonte em <code>docs/arquitetura/diagramas</code> (PlantUML, incluindo a biblioteca C4-PlantUML).</p>
 </section>
 
@@ -37,7 +36,7 @@ dos handlers. Este documento descreve a arquitetura-alvo e a refatoração entre
 arquiteturais pedidos: <em>Serverless, Microfrontends, BFF + Microsserviços + Database per Service, API Gateway, Arquitetura Orientada a
 Eventos, Clean Architecture com Vertical Slice e Testes Unitários de Arquitetura</em>.</p>
 
-<h3>1.1 Visão geral dos requisitos</h3>
+<h3>1.1 Visão Geral dos Requisitos</h3>
 <table>
   <thead><tr><th>ID</th><th>Requisito funcional</th><th>Endpoint</th><th>Serviço / fatia</th></tr></thead>
   <tbody>
@@ -55,7 +54,7 @@ Eventos, Clean Architecture com Vertical Slice e Testes Unitários de Arquitetur
 </table>
 <p>Erros seguem o contrato <code>{"erro": "mensagem"}</code>: 400 (validação), 404 (não encontrado), 422 (regra de negócio) e 429 (rate limit).</p>
 
-<h3>1.2 Objetivos de qualidade</h3>
+<h3>1.2 Objetivos de Qualidade</h3>
 <table>
   <thead><tr><th>Prioridade</th><th>Objetivo</th><th>Motivação</th></tr></thead>
   <tbody>
@@ -67,20 +66,20 @@ Eventos, Clean Architecture com Vertical Slice e Testes Unitários de Arquitetur
   </tbody>
 </table>
 
-<h3>1.3 Partes interessadas (stakeholders)</h3>
+<h3>1.3 Partes Interessadas</h3>
 <table>
-  <thead><tr><th>Papel</th><th>Expectativa em relação à arquitetura</th></tr></thead>
+  <thead><tr><th>Função/Nome</th><th>Contato</th><th>Expectativas</th></tr></thead>
   <tbody>
-    <tr><td>Cliente final</td><td>Fazer pedidos rapidamente, ver o total correto e acompanhar o status.</td></tr>
-    <tr><td>Restaurante parceiro</td><td>Manter o cardápio e ser avisado de novos pedidos imediatamente.</td></tr>
-    <tr><td>Times de desenvolvimento (Catálogo, Clientes, Pedidos, Front)</td><td>Autonomia de código, dados e deploy; regras de arquitetura claras e verificáveis.</td></tr>
-    <tr><td>Operação / SRE</td><td>Observabilidade (correlation id), escalabilidade automática e baixo custo operacional.</td></tr>
-    <tr><td>Professor / avaliadores</td><td>Rastreabilidade entre os estilos arquiteturais, os diagramas e o código entregue.</td></tr>
+    <tr><td>Cliente final</td><td>Canais web e mobile</td><td>Fazer pedidos rapidamente, ver o total correto e acompanhar o status.</td></tr>
+    <tr><td>Restaurante parceiro</td><td>Painel web; notificações</td><td>Manter o cardápio e ser avisado de novos pedidos imediatamente.</td></tr>
+    <tr><td>Times de desenvolvimento (Catálogo, Clientes, Pedidos, Front)</td><td>Integrantes do grupo (capa)</td><td>Autonomia de código, dados e deploy; regras de arquitetura claras e verificáveis.</td></tr>
+    <tr><td>Operação / SRE</td><td>Integrantes do grupo (capa)</td><td>Observabilidade (correlation id), escalabilidade automática e baixo custo operacional.</td></tr>
+    <tr><td>Professor / avaliadores</td><td>Disciplina</td><td>Rastreabilidade entre os estilos arquiteturais, os diagramas e o código entregue.</td></tr>
   </tbody>
 </table>
 
 <!-- ===================================================================== -->
-<h2 id="s2">2. Restrições de Arquitetura</h2>
+<h2 id="s2">2. Restrições Arquiteturais</h2>
 <table>
   <thead><tr><th>Tipo</th><th>Restrição</th><th>Consequência</th></tr></thead>
   <tbody>
@@ -98,7 +97,7 @@ Eventos, Clean Architecture com Vertical Slice e Testes Unitários de Arquitetur
 <!-- ===================================================================== -->
 <h2 id="s3">3. Contexto e Escopo</h2>
 
-<h3>3.1 Contexto de negócio (C4 Nível 1)</h3>
+<h3>3.1 Contexto Negocial (C4 Nível 1)</h3>
 {{diagrama c4-1-contexto 88 | C4 Nível 1: diagrama de contexto do sistema PedeJá}}
 <table>
   <thead><tr><th>Parceiro</th><th>Entrada para o PedeJá</th><th>Saída do PedeJá</th></tr></thead>
@@ -110,7 +109,7 @@ Eventos, Clean Architecture com Vertical Slice e Testes Unitários de Arquitetur
   </tbody>
 </table>
 
-<h3>3.2 Contexto técnico</h3>
+<h3>3.2 Contexto Técnico</h3>
 <table>
   <thead><tr><th>Canal</th><th>Protocolo / formato</th><th>Ponto de entrada</th></tr></thead>
   <tbody>
@@ -138,7 +137,7 @@ Eventos, Clean Architecture com Vertical Slice e Testes Unitários de Arquitetur
   </tbody>
 </table>
 
-<h3>4.1 Software Architecture Canvas</h3>
+<h3 class="nova-pagina">4.1 Software Architecture Canvas</h3>
 <div class="canvas">
   <div class="c-valor"><h4>Proposta de valor</h4><p>Pedir comida de restaurantes locais de forma rápida e confiável, com total transparente (subtotal + R$ 7,90) e aviso imediato ao restaurante.</p></div>
   <div class="c-stake"><h4>Stakeholders principais</h4><ul><li>Clientes</li><li>Restaurantes parceiros</li><li>Times Catálogo, Clientes, Pedidos e Front</li><li>Operação / SRE</li></ul></div>
@@ -154,8 +153,16 @@ Eventos, Clean Architecture com Vertical Slice e Testes Unitários de Arquitetur
 <!-- ===================================================================== -->
 <h2 id="s5">5. Visão de Blocos de Construção</h2>
 
-<h3>5.1 Nível 1: caixa-branca do sistema (C4 Nível 2 — Containers)</h3>
+<h3>5.1 Visão Sistêmica Geral de Caixa Branca (C4 Nível 2 — Containers)</h3>
 {{diagrama c4-2-containers 100 | C4 Nível 2: containers do PedeJá}}
+<dl>
+  <dt>Motivação</dt>
+  <dd>O sistema é decomposto por capacidade de negócio em microsserviços independentes (cada um com seu banco), expostos por um API Gateway e
+  consumidos por BFFs específicos de cada canal. A integração entre serviços é assíncrona, por eventos, para que falhas e picos de um serviço
+  não se propaguem aos demais.</dd>
+  <dt>Blocos de Construção Contidos</dt>
+  <dd>Os containers e suas responsabilidades estão na tabela abaixo.</dd>
+</dl>
 <table>
   <thead><tr><th>Container</th><th>Responsabilidade</th><th>Dados próprios</th></tr></thead>
   <tbody>
@@ -169,22 +176,27 @@ Eventos, Clean Architecture com Vertical Slice e Testes Unitários de Arquitetur
     <tr><td>Barramento de eventos</td><td>Roteia eventos de integração entre produtores e consumidores.</td><td>—</td></tr>
   </tbody>
 </table>
+<dl>
+  <dt>Interfaces Importantes</dt>
+  <dd>API REST pública <code>/api/*</code> e APIs de canal <code>/bff/web/*</code> e <code>/bff/mobile/*</code>, ambas pelo API Gateway (contrato
+  de erros <code>{"erro": "..."}</code>); eventos de integração definidos em <code>shared/contracts/eventos.ts</code> (seção 8.2).</dd>
+</dl>
 
-<h3>5.2 Nível 2: componentes (C4 Nível 3)</h3>
+<h3>5.2 Nível 2 (C4 Nível 3 — Componentes)</h3>
 <div class="paisagem">
-<h4>5.2.1 Serviço Pedidos</h4>
+<h4>5.2.1 Caixa Branca Serviço Pedidos</h4>
 <p>Cada caixa "Fatia" é uma pasta em <code>features/</code> com seu caso de uso e seu adaptador de entrada. As fatias dependem só das portas
 (<code>application</code>) e do domínio; os repositórios (<code>infrastructure</code>) implementam as portas e são instanciados pela composition root.</p>
 {{diagrama c4-3-componentes-pedidos 100 | C4 Nível 3: componentes do Serviço Pedidos}}
 </div>
 
-<h4>5.2.2 API Gateway e BFFs</h4>
-{{diagrama c4-3-componentes-gateway-bff 82 | C4 Nível 3: componentes do API Gateway e dos BFFs}}
+<h4>5.2.2 Caixa Branca API Gateway e BFFs</h4>
+{{diagrama c4-3-componentes-gateway-bff 100 | C4 Nível 3: componentes do API Gateway e dos BFFs}}
 
-<h4>5.2.3 Serviço Notificações (Serverless)</h4>
+<h4>5.2.3 Caixa Branca Serviço Notificações (Serverless)</h4>
 {{diagrama c4-3-componentes-notificacoes 58 | C4 Nível 3: componentes do Serviço Notificações}}
 
-<h4>5.2.4 Microfrontends</h4>
+<h4>5.2.4 Caixa Branca Web Shell (Microfrontends)</h4>
 <p>O shell (<code>frontend/index.html</code>) carrega cada MFE como um módulo independente, que registra um Custom Element. Os MFEs não importam
 código uns dos outros: comunicam-se por <code>CustomEvent</code> no <code>window</code> (<code>pedeja:restaurante-selecionado</code>,
 <code>pedeja:pedido-criado</code>), e cada um chama o BFF Web.</p>
@@ -206,17 +218,17 @@ as camadas de entrada e de caso de uso. Domínio, portas e infraestrutura são c
 <p>Árvore de <code>backend/src</code>, gerada automaticamente a partir do repositório no build deste documento:</p>
 {{arvore-codigo}}
 
-<h3>5.3 Nível 3: código (C4 Nível 4 — UML)</h3>
+<h3>5.3 Nível 3 (C4 Nível 4 — Código em UML)</h3>
 <p>O nível 4 do C4 é documentado com diagramas UML de <strong>classes</strong>, <strong>componentes</strong> e <strong>sequência</strong>.
 Os diagramas de sequência estão na seção 6 (visão de tempo de execução), conforme o template arc42.</p>
-<h4>5.3.1 Diagrama de classes: casos de uso, portas e adaptadores (Pedidos)</h4>
+<h4>5.3.1 Caixa Branca Pedidos: classes de casos de uso, portas e adaptadores</h4>
 {{diagrama c4-4-classes-pedidos 82 | C4 Nível 4: classes do Serviço Pedidos (casos de uso, portas e adaptadores)}}
-<h4>5.3.2 Diagrama de classes: domínio de Pedidos</h4>
-{{diagrama c4-4-classes-dominio 82 | C4 Nível 4: classes do domínio de Pedidos}}
-<h4>5.3.3 Diagrama de classes: shared kernel e EDA</h4>
-{{diagrama c4-4-classes-shared 85 | C4 Nível 4: classes do shared kernel (erros, portas, contratos de eventos)}}
-<h4>5.3.4 Diagrama de componentes UML (Pedidos)</h4>
-{{diagrama c4-4-componentes-uml 85 | C4 Nível 4: diagrama de componentes UML do Serviço Pedidos}}
+<h4>5.3.2 Caixa Branca Pedidos: classes do domínio</h4>
+{{diagrama c4-4-classes-dominio 100 | C4 Nível 4: classes do domínio de Pedidos}}
+<h4>5.3.3 Caixa Branca Shared Kernel: classes de erros, portas e eventos</h4>
+{{diagrama c4-4-classes-shared 95 | C4 Nível 4: classes do shared kernel (erros, portas, contratos de eventos)}}
+<h4>5.3.4 Caixa Branca Pedidos: componentes UML</h4>
+{{diagrama c4-4-componentes-uml 100 | C4 Nível 4: diagrama de componentes UML do Serviço Pedidos}}
 
 <!-- ===================================================================== -->
 <h2 id="s6">6. Visão de Tempo de Execução</h2>
@@ -236,18 +248,28 @@ cálculo do total. Persistido o pedido, publica <code>pedidos.PedidoCriado</code
 </div>
 
 <h3>6.3 Vitrine do restaurante via BFF Web</h3>
-{{diagrama seq-bff-vitrine 88 | Sequência: agregação no BFF Web}}
+{{diagrama seq-bff-vitrine 100 | Sequência: agregação no BFF Web}}
 
 <h3>6.4 Confirmar / cancelar pedido</h3>
-{{diagrama seq-cancelar-pedido 92 | Sequência: cancelar pedido}}
+{{diagrama seq-cancelar-pedido 100 | Sequência: cancelar pedido}}
 
 <h3>6.5 Ciclo de vida do pedido</h3>
 {{diagrama estado-pedido 55 | Máquina de estados do agregado Pedido}}
 
 <!-- ===================================================================== -->
 <h2 id="s7">7. Visão de Implantação</h2>
-<h3>7.1 Infraestrutura nível 1: AWS (produção)</h3>
-{{diagrama implantacao 96 | Implantação na AWS (serverless)}}
+<h3>7.1 Nível de Infraestrutura 1 (AWS — produção)</h3>
+{{diagrama implantacao 100 | Implantação na AWS (serverless)}}
+<dl>
+  <dt>Motivação</dt>
+  <dd>Modelo serverless na AWS: sem servidores para administrar, escala automática por função e custo proporcional ao uso, adequado à carga
+  com picos nos horários de refeição.</dd>
+  <dt>Características de Qualidade e/ou Desempenho</dt>
+  <dd>Cada função escala de forma independente; DynamoDB on-demand acompanha o volume; o EventBridge faz retentativas e envia para DLQ em caso
+  de falha do consumidor; inicialização fora do handler reduz o custo de cold start.</dd>
+  <dt>Mapeamento de Blocos de Construção para Infraestrutura</dt>
+  <dd>Conforme a tabela abaixo.</dd>
+</dl>
 <table>
   <thead><tr><th>Bloco de construção</th><th>Artefato</th><th>Infraestrutura</th></tr></thead>
   <tbody>
@@ -259,10 +281,11 @@ cálculo do total. Persistido o pedido, publica <code>pedidos.PedidoCriado</code
     <tr><td>Bancos por serviço</td><td>Adaptadores dos repositórios</td><td>Amazon DynamoDB (tabelas separadas, IAM por função)</td></tr>
   </tbody>
 </table>
-<h3>7.2 Infraestrutura nível 1: ambiente local</h3>
+<h3>7.2 Nível de Infraestrutura 2</h3>
+<h4>7.2.1 Ambiente local de desenvolvimento</h4>
 <p>Para desenvolvimento e testes, <code>app.ts</code> (composition root local) sobe gateway, BFFs e serviços num único processo, ligados pelo
 barramento em memória. Os casos de uso são os mesmos da nuvem; só mudam os adaptadores.</p>
-{{diagrama implantacao-local 72 | Implantação local (desenvolvimento)}}
+{{diagrama implantacao-local 90 | Implantação local (desenvolvimento)}}
 
 <!-- ===================================================================== -->
 <h2 id="s8">8. Conceitos Transversais</h2>
@@ -271,7 +294,7 @@ barramento em memória. Os casos de uso são os mesmos da nuvem; só mudam os ad
 <p>Cada serviço é dono do seu banco. Relações entre bancos são apenas <em>referências lógicas</em> (ids), sem chave estrangeira física. O Serviço
 Pedidos guarda réplicas mínimas (restaurante, produto, cliente) alimentadas por eventos e faz snapshot de nome e preço em
 <code>item_pedido</code>, para que mudanças futuras no cardápio não alterem pedidos já feitos.</p>
-{{diagrama der 92 | Diagrama de Entidades e Relacionamentos (um banco por serviço)}}
+{{diagrama der 100 | Diagrama de Entidades e Relacionamentos (um banco por serviço)}}
 
 <h3>8.2 Arquitetura orientada a eventos</h3>
 {{diagrama eda 100 | Produtores, eventos de integração e consumidores}}
@@ -322,7 +345,7 @@ ao front o status e o corpo do serviço chamado (<code>ErroServico</code>).</p>
 </ul>
 
 <!-- ===================================================================== -->
-<h2 id="s9">9. Decisões de Arquitetura</h2>
+<h2 id="s9">9. Decisões Arquiteturais</h2>
 <table class="adr">
   <thead><tr><th>ADR</th><th>Decisão</th><th>Contexto e justificativa</th><th>Consequências</th></tr></thead>
   <tbody>
@@ -340,9 +363,9 @@ ao front o status e o corpo do serviço chamado (<code>ErroServico</code>).</p>
 
 <!-- ===================================================================== -->
 <h2 id="s10">10. Requisitos de Qualidade</h2>
-<h3>10.1 Árvore de qualidade</h3>
+<h3>10.1 Árvore de Qualidade</h3>
 {{diagrama arvore-qualidade 100 | Árvore de qualidade}}
-<h3>10.2 Cenários de qualidade</h3>
+<h3>10.2 Cenários de Qualidade</h3>
 <table>
   <thead><tr><th>ID</th><th>Atributo</th><th>Estímulo</th><th>Resposta esperada</th><th>Como é atendido</th></tr></thead>
   <tbody>

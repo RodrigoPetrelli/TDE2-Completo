@@ -52,8 +52,12 @@ Valores monetários em centavos (inteiros). Erros retornam `{ "erro": "mensagem"
 
 ## Documentação
 
-Os fontes dos diagramas (PlantUML / C4-PlantUML) ficam em `docs/arquitetura/diagramas`, o texto arc42 em `docs/arquitetura/arc42.html` e os nomes do grupo em `docs/arquitetura/grupo.json`. Para regenerar o PDF (requer Java 11+ e Edge ou Chrome):
+A documentação é produzida sobre o **template oficial arc42 em português** (`docs/arquitetura/template/arc42-template-PT.docx`, baixado de arc42.org) e entregue em `PedeJa-Arquitetura-arc42.docx` e `PedeJa-Arquitetura-arc42.pdf`.
+
+Os fontes dos diagramas (PlantUML / C4-PlantUML) ficam em `docs/arquitetura/diagramas`, o texto em `docs/arquitetura/arc42.html` e os nomes do grupo em `docs/arquitetura/grupo.json`. Para regenerar (requer Java 11+, Python 3 e Microsoft Word no Windows):
 
 ```bash
-cd docs/arquitetura && npm install && npm run build
+cd docs/arquitetura
+pip install -r requirements.txt
+npm run build
 ```

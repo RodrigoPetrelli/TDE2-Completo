@@ -1,7 +1,5 @@
 @startuml seq-replicacao-catalogo
 !include _estilo.iuml
-skinparam maxMessageSize 95
-skinparam ParticipantPadding 4
 skinparam defaultFontSize 14
 autonumber
 

@@ -1,49 +1,40 @@
 @startuml seq-criar-pedido
 !include _estilo.iuml
-skinparam maxMessageSize 95
-skinparam ParticipantPadding 4
 skinparam defaultFontSize 14
-skinparam sequenceMessageAlign center
+skinparam ParticipantPadding 6
 autonumber
 
 title C4 Nível 4 — Sequência (UML): Criar pedido e notificar o restaurante
 
-actor Cliente
-participant "MFE Pedidos" as MFE
-participant "API Gateway" as GW
-participant "criar-pedido.http" as HTTP
+actor "Cliente\n(MFE Pedidos)" as Cliente
+participant "API Gateway\n+ criar-pedido.http" as GW
 participant "CriarPedido" as UC
-participant "ClientesLocal\nRepositorio" as RCli
-participant "CatalogoLocal\nRepositorio" as RCat
+participant "Réplicas locais\n(Clientes, Catálogo)" as Rep
 participant "Pedido" as P <<aggregate>>
 participant "Pedido\nRepositorio" as RPed
 queue "Barramento\n(EventBridge)" as Bus
 participant "Lambda\nNotificações" as NOT
 
-Cliente -> MFE : Fazer pedido
-MFE -> GW : POST /api/pedidos
+Cliente -> GW : POST /api/pedidos
 GW -> GW : x-request-id, rate limit
-GW -> HTTP : rota /api (servico-pedidos)
-HTTP -> UC : executar(corpo)
+GW -> UC : executar(corpo)
 UC -> UC : validar formato (400)
-UC -> RCli : existe(clienteId)
-RCli --> UC : true
-UC -> RCat : obterRestaurante(id)
-RCat --> UC : RestauranteLocal
+UC -> Rep : existe(clienteId)
+UC -> Rep : obterRestaurante(id)
 loop para cada item
-  UC -> RCat : obterProduto(produtoId)
-  RCat --> UC : ProdutoOfertado
+  UC -> Rep : obterProduto(produtoId)
+  Rep --> UC : ProdutoOfertado
 end
+note right of Rep : ausente -> 404
 UC -> P : criar(linhas)
-P -> P : garantirPodeSerPedidoEm (422)\ncalcula subtotal + taxa 790
+P -> P : regras (422),\nsubtotal + taxa 790
 P --> UC : pedido CRIADO
 UC -> RPed : salvar(pedido)
-UC -> Bus : publicar(pedidos.PedidoCriado)
+UC -> Bus : publicar(PedidoCriado)
 Bus -->> NOT : entrega assíncrona
 activate NOT
 NOT -> NOT : NotificarNovoPedido\n(avisa restaurante via SNS)
 deactivate NOT
-UC --> HTTP : DadosPedido
-HTTP --> GW : 201 Created
-GW --> MFE : 201 + pedido
+UC --> GW : DadosPedido
+GW --> Cliente : 201 Created
 @enduml

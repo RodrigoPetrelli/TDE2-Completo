@@ -1,21 +1,23 @@
-// Gera docs/arquitetura/PedeJa-Arquitetura-arc42.pdf:
-//   1. renderiza diagramas/*.puml em SVG (PlantUML + C4-PlantUML embutido);
-//   2. preenche arc42.html (grupo, diagramas numerados, sumário, árvore do código
-//      e lista dos testes de arquitetura lidos do repositório);
-//   3. imprime em PDF com o Edge/Chrome instalado (puppeteer-core).
-// Requisitos: Java 11+ e Microsoft Edge ou Google Chrome.
+// Gera a documentação arc42 do PedeJá a partir do TEMPLATE OFICIAL arc42 (PT, .docx):
+//   1. renderiza diagramas/*.puml em PNG (PlantUML + C4-PlantUML embutido);
+//   2. preenche arc42.html (grupo, diagramas numerados, árvore do código e lista
+//      dos testes de arquitetura lidos do repositório);
+//   3. gerar_docx.py aplica esse conteúdo sobre template/arc42-template-PT.docx;
+//   4. exportar_pdf.ps1 atualiza o sumário no Microsoft Word e exporta o PDF.
+// Requisitos: Java 11+, Python 3 com requirements.txt e Microsoft Word (Windows).
 
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import puppeteer from 'puppeteer-core';
+import { fileURLToPath } from 'node:url';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const RAIZ = path.resolve(DIR, '../..');
 const GERADO = path.join(DIR, 'gerado');
 const PLANTUML_URL = 'https://github.com/plantuml/plantuml/releases/download/v1.2025.4/plantuml-1.2025.4.jar';
 const PLANTUML_JAR = path.join(DIR, '.tools', 'plantuml.jar');
+const TEMPLATE = path.join(DIR, 'template', 'arc42-template-PT.docx');
+const SAIDA_DOCX = path.join(DIR, 'PedeJa-Arquitetura-arc42.docx');
 const SAIDA_PDF = path.join(DIR, 'PedeJa-Arquitetura-arc42.pdf');
 
 async function garantirPlantUml() {
@@ -31,7 +33,7 @@ function renderizarDiagramas() {
   fs.mkdirSync(GERADO, { recursive: true });
   const fontes = fs.readdirSync(path.join(DIR, 'diagramas')).filter((f) => f.endsWith('.puml'));
   console.log(`Renderizando ${fontes.length} diagramas...`);
-  execFileSync('java', ['-jar', PLANTUML_JAR, '-tsvg', '-failfast2', '-o', GERADO, ...fontes.map((f) => path.join(DIR, 'diagramas', f))], {
+  execFileSync('java', ['-jar', PLANTUML_JAR, '-tpng', '-Sdpi=200', '-failfast2', '-o', GERADO, ...fontes.map((f) => path.join(DIR, 'diagramas', f))], {
     stdio: ['ignore', 'inherit', 'pipe'],
   });
   return new Set(fontes.map((f) => f.replace(/\.puml$/, '')));
@@ -72,7 +74,7 @@ function montarHtml(diagramasDisponiveis) {
   html = html.replace(/\{\{diagrama ([\w-]+) (\d+)( paisagem)? \| ([^}]+)\}\}/g, (_m, nome, largura, paisagem, legenda) => {
     if (!diagramasDisponiveis.has(nome)) throw new Error(`Diagrama inexistente: ${nome}`);
     numero += 1;
-    const figura = `<figure><img src="${nome}.svg" style="width:${largura}%" alt="${legenda.trim()}" /><figcaption>Figura ${numero} — ${legenda.trim()}</figcaption></figure>`;
+    const figura = `<figure><img src="${nome}.png" style="width:${largura}%" alt="${legenda.trim()}" /><figcaption>Figura ${numero} — ${legenda.trim()}</figcaption></figure>`;
     return paisagem ? `<div class="paisagem">${figura}</div>` : figura;
   });
 
@@ -110,51 +112,24 @@ function montarHtml(diagramasDisponiveis) {
   html = html.replace('{{sumario}}', `${sumario}</ol>`);
 
   if (/\{\{[^}]+\}\}/.test(html)) throw new Error(`Marcador não substituído: ${/\{\{[^}]+\}\}/.exec(html)[0]}`);
-  fs.copyFileSync(path.join(DIR, 'estilo.css'), path.join(GERADO, 'estilo.css'));
   const destino = path.join(GERADO, 'arc42.html');
   fs.writeFileSync(destino, html);
   return { destino, pendentes, figuras: numero };
 }
 
-function localizarNavegador() {
-  const candidatos = [
-    process.env.NAVEGADOR,
-    'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
-    'C:/Program Files/Microsoft/Edge/Application/msedge.exe',
-    'C:/Program Files/Google/Chrome/Application/chrome.exe',
-    '/usr/bin/google-chrome',
-    '/usr/bin/chromium',
-    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-  ].filter(Boolean);
-  const encontrado = candidatos.find((c) => fs.existsSync(c));
-  if (!encontrado) throw new Error('Edge/Chrome não encontrado. Defina a variável NAVEGADOR com o caminho do executável.');
-  return encontrado;
-}
-
-async function gerarPdf(arquivoHtml) {
-  const navegador = await puppeteer.launch({ executablePath: localizarNavegador(), headless: true });
-  try {
-    const pagina = await navegador.newPage();
-    await pagina.goto(pathToFileURL(arquivoHtml).href, { waitUntil: 'networkidle0' });
-    await pagina.evaluate(() => Promise.all([...document.images].map((img) => img.decode())));
-    await pagina.pdf({
-      path: SAIDA_PDF,
-      preferCSSPageSize: true,
-      printBackground: true,
-      displayHeaderFooter: true,
-      headerTemplate: '<span></span>',
-      footerTemplate:
-        '<div style="width:100%;font-size:8px;color:#666;padding:0 16mm;display:flex;justify-content:space-between;font-family:Segoe UI,Arial">' +
-        '<span>PedeJá — Documentação de Arquitetura (arc42)</span><span>Página <span class="pageNumber"></span> de <span class="totalPages"></span></span></div>',
-    });
-  } finally {
-    await navegador.close();
-  }
+function gerarDocxEPdf(arquivoHtml) {
+  execFileSync(process.env.PYTHON ?? 'python', [path.join(DIR, 'gerar_docx.py'), arquivoHtml, TEMPLATE, path.join(DIR, 'grupo.json'), SAIDA_DOCX], {
+    stdio: 'inherit',
+  });
+  console.log('Exportando PDF pelo Microsoft Word...');
+  execFileSync('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(DIR, 'exportar_pdf.ps1'), SAIDA_DOCX, SAIDA_PDF], {
+    stdio: 'inherit',
+  });
 }
 
 await garantirPlantUml();
 const diagramas = renderizarDiagramas();
 const { destino, pendentes, figuras } = montarHtml(diagramas);
-await gerarPdf(destino);
+gerarDocxEPdf(destino);
 console.log(`PDF gerado: ${SAIDA_PDF} (${figuras} figuras)`);
 if (pendentes.length) console.warn(`ATENÇÃO: preencha os nomes dos integrantes em grupo.json (${pendentes.length} pendente(s)).`);
